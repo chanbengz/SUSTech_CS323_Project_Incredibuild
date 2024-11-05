@@ -1,6 +1,7 @@
 [package]
 name = "SUSTech_CS323_Project_Incredibuild"
 version = "0.1.0"
-edition = "2024"
 
 [dependencies]
+peg = "0.8.4"
+llvm-ir = { version = "0.11.1", features = ["llvm-17"] }
