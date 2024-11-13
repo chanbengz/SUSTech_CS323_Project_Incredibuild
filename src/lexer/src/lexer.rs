@@ -1,4 +1,4 @@
-use logos::Logos;
+use logos::{Logos, FilterResult};
 
 use std::num::ParseIntError;
 
@@ -7,6 +7,7 @@ pub enum LexingError {
     InvalidInteger(String),
     InvalidCharacter(String),
     InvalidString(String),
+    UnexpectedEndOfProgram,
     #[default]
     NonAsciiCharacter,
 }
@@ -70,7 +71,7 @@ pub enum Token {
     OpDecrement,
 
     // Punctuation
-    #[token(".")]
+    #[token(".", priority = 5)]
     Dot,
     #[token(",")]
     Comma,
@@ -130,26 +131,95 @@ pub enum Token {
     TypeNull,
 
     // Literals
-    #[token("true|false", |lex| lex.slice() == "true", priority = 6)]
+    #[regex("true|false", |lex| lex.slice() == "true")]
     LiteralBool(bool),
-    #[regex(r"-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?", |lex| lex.slice().parse::<f32>().unwrap(), priority = 6)]
+    #[regex(r"-?(?:0|[1-9]\d*)?\.\d+(?:[eE][+-]?\d+)?", |lex| lex.slice().parse::<f32>().unwrap(), priority = 10)]
     LiteralFloat(f32),
     #[regex(r"-?[0-9]+", |lex| lex.slice().parse::<i32>().unwrap())]
-    #[regex(r"-?0[xX][0-9a-fA-F]+", |lex| i32::from_str_radix(lex.slice(), 16).unwrap())]
+    #[regex(r"-?0[xX][0-9a-fA-F]+", |lex| {
+        if lex.slice().chars().nth(0) == Some('-') {
+            let hex = &lex.slice()[3..]; // Extract the hex part after -0x
+            -i32::from_str_radix(hex, 16).unwrap()
+        } else {
+            let hex = &lex.slice()[2..]; // Extract the hex part after 0x
+            i32::from_str_radix(hex, 16).unwrap()
+        }
+    })]
     LiteralInt(i32),
     #[regex(r"'.'", |lex| lex.slice().chars().nth(1).unwrap_or_default())]
-    #[regex(r"'\\[xX][0-9a-fA-F]{4}'", |lex| {
-        let escape_sequence = &lex.slice()[3..]; // Extract the hex part after \x
-        char::from_u32(u32::from_str_radix(escape_sequence, 16).unwrap_or_default()).unwrap_or_default()
+    #[regex(r"'\\u[0-9a-fA-F]{1,6}'", |lex| {
+        let slice = lex.slice();
+        let hex_part = &slice[3..slice.len() - 1]; // Extract the hex part after \x
+        match u32::from_str_radix(hex_part, 16) {
+            Ok(u) => {
+                match std::char::from_u32(u) {
+                    Some(c) => Ok(c),
+                    None => return Err(LexingError::NonAsciiCharacter),
+                }
+            }
+            Err(e) => return Err(e.into()),
+        }
     })]
     LiteralChar(char),
-    #[regex(r#""([^"\\]|\\["\\bnfrt]|u[a-fA-F0-9]{4})*""#, |lex| lex.slice().to_owned())]
+    #[regex(r#""([^"\\]|\\["\\bnfrt]|\\x[0-9a-fA-F]{2}|\\u[a-fA-F0-9]{1,6})*""#, process_string)]
     LiteralString(String),
 
     // Identifier
-    #[regex("[a-zA-Z_$][a-zA-Z0-9_$]*")]
+    #[regex(r"[a-zA-Z_$][a-zA-Z0-9_$]*")]
     Identifier,
 
-    #[regex("//[^\n]*")]
-    LineComment
+    #[regex(r"//[^\n]*\n?", logos::skip)]
+    LineComment,
+    #[token("/*", process_block_comment)]
+    BlockComment
+}
+
+fn process_string(lex: &mut logos::Lexer<Token>) -> Result<String, LexingError> {
+    let slice = lex.slice();
+    let mut chars = slice.chars().skip(1).take(slice.len() - 2);
+    let mut result = String::new();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => {
+                match chars.next() {
+                    Some('x') => {
+                        // Parse hexadecimal byte (\xNN)
+                        let hex = chars.by_ref().take(2).collect::<String>();
+                        if let Ok(byte) = u8::from_str_radix(&hex, 16) {
+                            result.push(byte as char);
+                        }
+                    }
+                    Some('u') => {
+                        // Parse Unicode escape (\u{NNNN})
+                        if chars.next() == Some('{') {
+                            let unicode = chars.by_ref().take_while(|&c| c != '}').collect::<String>();
+                            if let Ok(value) = u32::from_str_radix(&unicode, 16) {
+                                if let Some(ch) = char::from_u32(value) {
+                                    result.push(ch);
+                                }
+                            }
+                        }
+                    }
+                    Some('n') => result.push('\n'),
+                    Some('r') => result.push('\r'),
+                    Some('t') => result.push('\t'),
+                    Some('b') => result.push('\x08'), // Backspace
+                    Some('f') => result.push('\x0C'), // Form feed
+                    Some(other) => result.push(other), // Any other escaped character
+                    None => break, // End of string
+                }
+            }
+            c => result.push(c),
+        }
+    }
+    Ok(result)
+}
+
+fn process_block_comment(lex: &mut logos::Lexer<Token>) -> FilterResult<(), LexingError> {
+    if let Some(len) = lex.remainder().find("*/")  {
+        lex.bump(len + 2);
+        FilterResult::Skip
+    } else {
+        FilterResult::Error(LexingError::UnexpectedEndOfProgram)
+    }
 }

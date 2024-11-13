@@ -3,6 +3,7 @@ extern crate logos;
 mod lexer;
 pub use lexer::Token;
 pub use logos::{Logos, Lexer, Source};
+pub use std::fs::File;
 
 // #[inline]
 // pub fn read_pragma<'source>(lex: &mut Lexer<Token>) -> S::Slice {
@@ -46,18 +47,16 @@ mod test {
     use lexer::Token;
     use lexer::Token::*;
     use logos::Logos;
+    use File;
+    use std::io::Read;
 
     fn assert_lex<T>(source: &str, tokens: T)
     where
         T: AsRef<[(Token, &'static str)]>
     {
-        let mut lexer = Token::lexer(source);  // Create a Logos lexer for the source
-
-        // Iterate over the expected tokens
+        let mut lexer = Token::lexer(source); 
         for &(ref token, slice) in tokens.as_ref() {
-            // Get the next token from the lexer
             if let Some(lexed_token) = lexer.next() {
-                // Assert that the token type and slice match the expected values
                 assert!(
                     lexed_token == Ok(token.clone()) && lexer.slice() == slice,
                     "\n\n\n\tExpected {:?}({:?}), found {:?}({:?}) instead!\n\n\n",
@@ -67,13 +66,40 @@ mod test {
                     lexer.slice()
                 );
             } else {
-                // If no more tokens are available but we still have expected tokens, fail the test
-                panic!("Unexpected end of tokens while lexing.");
+               panic!("Unexpected end of tokens while lexing.");
             }
         }
 
-        // Ensure that the lexer has reached the end of the source
-        assert_eq!(lexer.next(), None);  // Lexer should be done
+        assert_eq!(lexer.next(), None);
+    }
+
+    fn assert_lex_from_file<T>(file_path: &str, tokens: T) 
+    where
+        T: AsRef<[(Token, &'static str)]>
+    {
+        let mut file_content = String::new();
+        let mut file = File::open(file_path).expect("Unable to open file");
+        file.read_to_string(&mut file_content)
+            .expect("Unable to read file");
+    
+        let mut lexer = Token::lexer(&file_content);
+    
+        for &(ref token, slice) in tokens.as_ref() {
+            if let Some(lexed_token) = lexer.next() {
+                assert!(
+                    lexed_token == Ok(token.clone()) && lexer.slice() == slice,
+                    "\n\n\n\tExpected {:?}({:?}), found {:?}({:?}) instead!\n\n\n",
+                    token,
+                    slice,
+                    lexed_token,
+                    lexer.slice()
+                );
+            } else {
+               panic!("Unexpected end of tokens while lexing.");
+            }
+        }
+    
+        assert_eq!(lexer.next(), None);
     }
 
 
@@ -87,15 +113,14 @@ mod test {
         assert_lex(" // foo\nbar", [(Identifier, "bar")]);
     }
 
-    // #[test]
-    // fn block_comment() {
-    //     assert_lex(" /* foo */ bar", [(Identifier, "bar")]);
-    //     assert_lex(" /* foo **/ bar", [(Identifier, "bar")]);
-    //     assert_lex(" /* foo ***/ bar", [(Identifier, "bar")]);
-    //     assert_lex(" /* foo ****/ bar", [(Identifier, "bar")]);
-    //     assert_lex(" /* foo *****/ bar", [(Identifier, "bar")]);
-    //     assert_lex(" /* foo ", [(UnexpectedEndOfProgram, "/* foo ")]);
-    // }
+    #[test]
+    fn block_comment() {
+        assert_lex(" /* foo */ bar", [(Identifier, "bar")]);
+        assert_lex(" /* foo **/ bar", [(Identifier, "bar")]);
+        assert_lex(" /* foo ***/ bar", [(Identifier, "bar")]);
+        assert_lex(" /* foo ****/ bar", [(Identifier, "bar")]);
+        assert_lex(" /* foo *****/ bar", [(Identifier, "bar")]);
+    }
 
     #[test]
     fn identifiers() {
@@ -144,7 +169,7 @@ mod test {
     fn literals() {
         assert_lex(
             r#"
-                true false 0 42 0xDEAD 0Xdead 3.14 .12345 500.1 10.000 'foo bar' "doge to the moon"
+                true false 0 42 0xDEAD 0Xdead 3.14 .12345 500.1 10.000 'f' '\u2764' "doge to the moon"
             "#,
              &[
                 (LiteralBool(true), "true"),
@@ -158,6 +183,7 @@ mod test {
                 (LiteralFloat(500.1), "500.1"),
                 (LiteralFloat(10.000), "10.000"),
                 (LiteralChar(char::from('f')), "'f'"),
+                (LiteralChar(char::from('❤')), r"'\u2764'"),
                 (LiteralString(String::from("doge to the moon")), r#""doge to the moon""#),
             ][..]
         );
@@ -171,7 +197,8 @@ mod test {
         "#,
         &[
             (Identifier, "foo"),
-            (LiteralString(String::from("\x19Ethereum Signed Message:\n47Please take my Ether and try to build Polkadot.")), r#""\x19Ethereum Signed Message:\n47Please take my Ether and try to build Polkadot.""#),
+            (LiteralString(String::from("\x19Ethereum Signed Message:\n47Please take my Ether and try to build Polkadot.")), 
+            r#""\x19Ethereum Signed Message:\n47Please take my Ether and try to build Polkadot.""#),
         ])
     }
 
@@ -253,22 +280,60 @@ mod test {
         );
     }
 
-    // #[test]
-    // fn second_price_auction() {
-    //     let source = include_str!("../../lunarity/benches/second-price-auction.sol");
-
-    //     let mut lex = Token::lexer(source);
-    //     let mut tokens = 0;
-
-    //     while lex.token != EndOfProgram {
-    //         assert_ne!(lex.token, UnexpectedToken, "Unexpected: {} at {:?}", lex.slice(), lex.range());
-    //         assert_ne!(lex.token, UnexpectedEndOfProgram);
-
-    //         tokens += 1;
-
-    //         lex.advance();
-    //     }
-
-    //     assert_eq!(tokens, 1299);
-    // }
+    #[test]
+    fn synthesis_test() {
+        let file_path = "src/test.spl";
+        /*
+            int main(){
+                int a = 3;
+                while (true){
+                    a = a + 1;
+                    if (a == 5){
+                        break;
+                    }
+                }
+                return;
+            }
+         */
+        assert_lex_from_file(
+            file_path,
+            &[
+                (TypeInt, "int"),
+                (Identifier, "main"),
+                (LeftParen, "("),
+                (RightParen, ")"),
+                (LeftBrace, "{"),
+                (TypeInt, "int"),
+                (Identifier, "a"),
+                (OpAssign, "="),
+                (LiteralInt(3), "3"),
+                (Semicolon, ";"),
+                (KeywordWhile, "while"),
+                (LeftParen, "("),
+                (LiteralBool(true), "true"),
+                (RightParen, ")"),
+                (LeftBrace, "{"),
+                (Identifier, "a"),
+                (OpAssign, "="),
+                (Identifier, "a"),
+                (OpPlus, "+"),
+                (LiteralInt(1), "1"),
+                (Semicolon, ";"),
+                (KeywordIf, "if"),
+                (LeftParen, "("),
+                (Identifier, "a"),
+                (OpEqual, "=="),
+                (LiteralInt(5), "5"),
+                (RightParen, ")"),
+                (LeftBrace, "{"),
+                (KeywordBreak,"break"),
+                (Semicolon, ";"),
+                (RightBrace, "}"),
+                (RightBrace, "}"),
+                (KeywordReturn, "return"),
+                (Semicolon, ";"),
+                (RightBrace, "}"),
+            ][..]
+        );
+    }
 }
