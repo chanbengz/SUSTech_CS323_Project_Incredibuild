@@ -1,6 +1,6 @@
 extern crate logos;
 
-mod lexer;
+pub mod lexer;
 pub use lexer::Token;
 pub use logos::{Logos, Lexer, Source};
 pub use std::fs::File;
@@ -282,7 +282,7 @@ mod test {
 
     #[test]
     fn synthesis_test() {
-        let file_path = "src/test.spl";
+        let file_path = "../test/test.spl";
         /*
             int main(){
                 int a = 3;

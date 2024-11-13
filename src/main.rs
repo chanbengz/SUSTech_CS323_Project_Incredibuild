@@ -1,6 +1,3 @@
-#![feature(plugin)]
-#![plugin(peg_syntax_ext)]
-
 extern crate llvm_ir as llvm;
 
 use std::ffi::CString;
@@ -19,15 +16,6 @@ fn main() {
         codegen(parsed_input);
     }
 }
-
-peg! parser(r#"
-    #[pub]
-    program -> String
-        = i:int_literal "\n" { i }
-
-    int_literal -> String
-        = [0-9]+ { match_str.to_owned() }
-"#);
 
 unsafe fn codegen(input: String) {
     let context = llvm::core::LLVMContextCreate();
