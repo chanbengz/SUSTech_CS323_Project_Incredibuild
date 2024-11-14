@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = [
+members = [ "src/ast",
     "src/lexer",
-    "src/parser"
+    "src/parser",
+    "src/ast"
 ]
 
 [dependencies]

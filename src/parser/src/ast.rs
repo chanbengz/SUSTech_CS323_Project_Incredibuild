@@ -21,6 +21,8 @@ impl fmt::Display for Expr {
         match self {
             Expr::Integer(i) => write!(f, "{}", i),
             Expr::BinaryOperation(lhs, op, rhs) => write!(f, "({} {} {})", lhs, op, rhs),
+            Expr::Float(fl) => write!(f, "{}", fl),
+            Expr::UnaryOperation(op, expr) => write!(f, "({}{})", op, expr), // Minus and Not
         }
     }
 }
