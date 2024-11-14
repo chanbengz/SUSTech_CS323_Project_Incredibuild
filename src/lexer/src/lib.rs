@@ -1,6 +1,7 @@
 extern crate logos;
 
-mod tokens;
+pub mod tokens;
+pub mod lexer;
 pub use tokens::Token;
 pub use logos::{Logos, Lexer, Source};
 pub use std::fs::File;

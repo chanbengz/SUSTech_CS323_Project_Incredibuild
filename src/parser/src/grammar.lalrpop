@@ -1,0 +1,48 @@
+use spl_lexer::tokens::{Token, LexicalError};
+use crate::ast;
+
+grammar;
+
+extern {
+  type Location = usize;
+  type Error = LexicalError;
+
+  enum Token {
+    "identifier" => Token::Identifier(<String>),
+    "int" => Token::LiteralInt(<i32>),
+    "(" => Token::LeftParen,
+    ")" => Token::RightParen,
+    "+" => Token::OpPlus,
+    "-" => Token::OpMinus,
+    "*" => Token::OpMul,
+    "/" => Token::OpDiv,
+  }
+}
+
+pub Expr: Box<ast::Expr> = {
+#[precedence(level="1")]
+    Term,
+
+#[precedence(level="2")] #[assoc(side="left")]
+    <lhs:Expr> "*" <rhs:Expr> => {
+    Box::new(ast::Expr::BinaryOperation (
+      lhs, ast::Operator::Mul, rhs
+    ))
+    },
+
+    <lhs:Expr> "/" <rhs:Expr> => {
+    Box::new(ast::Expr::BinaryOperation (
+      lhs, ast::Operator::Div, rhs
+    ))
+    },
+
+#[precedence(level="3")] #[assoc(side="left")]
+    <lhs:Expr> "+" <rhs:Term> => Box::new(ast::Expr::BinaryOperation (
+        lhs, ast::Operator::Add, rhs
+    )),
+    "(" <Expr> ")",
+};
+
+Term: Box<ast::Expr> = {
+    <n: "int"> => Box::new(ast::Expr::Integer(n)),
+}
