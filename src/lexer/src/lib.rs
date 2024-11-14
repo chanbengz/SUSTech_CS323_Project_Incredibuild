@@ -44,10 +44,10 @@ pub use std::fs::File;
 
 #[cfg(test)]
 mod test {
-    use tokens::Token;
-    use tokens::Token::*;
+    use crate::tokens::Token;
+    use crate::tokens::Token::*;
     use logos::Logos;
-    use File;
+    use std::fs::File;
     use std::io::Read;
 
     fn assert_lex<T>(source: &str, tokens: T)

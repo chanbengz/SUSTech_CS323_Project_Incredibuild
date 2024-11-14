@@ -1,10 +1,12 @@
 [package]
 name = "SUSTech_CS323_Project_Incredibuild"
 version = "0.1.0"
+edition = "2021"
 
 [workspace]
 members = [
     "src/lexer",
+    "src/parser"
 ]
 
 [dependencies]
