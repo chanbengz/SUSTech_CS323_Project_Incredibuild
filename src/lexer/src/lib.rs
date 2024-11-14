@@ -1,7 +1,7 @@
 extern crate logos;
 
-pub mod lexer;
-pub use lexer::Token;
+mod tokens;
+pub use tokens::Token;
 pub use logos::{Logos, Lexer, Source};
 pub use std::fs::File;
 
@@ -44,8 +44,8 @@ pub use std::fs::File;
 
 #[cfg(test)]
 mod test {
-    use lexer::Token;
-    use lexer::Token::*;
+    use tokens::Token;
+    use tokens::Token::*;
     use logos::Logos;
     use File;
     use std::io::Read;
@@ -110,16 +110,16 @@ mod test {
 
     #[test]
     fn line_comment() {
-        assert_lex(" // foo\nbar", [(Identifier, "bar")]);
+        assert_lex(" // foo\nbar", [(Identifier(String::from("bar")), "bar")]);
     }
 
     #[test]
     fn block_comment() {
-        assert_lex(" /* foo */ bar", [(Identifier, "bar")]);
-        assert_lex(" /* foo **/ bar", [(Identifier, "bar")]);
-        assert_lex(" /* foo ***/ bar", [(Identifier, "bar")]);
-        assert_lex(" /* foo ****/ bar", [(Identifier, "bar")]);
-        assert_lex(" /* foo *****/ bar", [(Identifier, "bar")]);
+        assert_lex(" /* foo */ bar", [(Identifier(String::from("bar")), "bar")]);
+        assert_lex(" /* foo **/ bar", [(Identifier(String::from("bar")), "bar")]);
+        assert_lex(" /* foo ***/ bar", [(Identifier(String::from("bar")), "bar")]);
+        assert_lex(" /* foo ****/ bar", [(Identifier(String::from("bar")), "bar")]);
+        assert_lex(" /* foo *****/ bar", [(Identifier(String::from("bar")), "bar")]);
     }
 
     #[test]
@@ -129,17 +129,17 @@ mod test {
                 foo _foo $foo $_foo _ $ $$ fooBar BarFoo foo10 $1
             ",
              &[
-                (Identifier, "foo"),
-                (Identifier, "_foo"),
-                (Identifier, "$foo"),
-                (Identifier, "$_foo"),
-                (Identifier, "_"),
-                (Identifier, "$"),
-                (Identifier, "$$"),
-                (Identifier, "fooBar"),
-                (Identifier, "BarFoo"),
-                (Identifier, "foo10"),
-                (Identifier, "$1"),
+                (Identifier(String::from("foo")), "foo"),
+                (Identifier(String::from("_foo")), "_foo"),
+                (Identifier(String::from("$foo")), "$foo"),
+                (Identifier(String::from("$_foo")), "$_foo"),
+                (Identifier(String::from("_")), "_"),
+                (Identifier(String::from("$")), "$"),
+                (Identifier(String::from("$$")), "$$"),
+                (Identifier(String::from("fooBar")), "fooBar"),
+                (Identifier(String::from("BarFoo")), "BarFoo"),
+                (Identifier(String::from("foo10")), "foo10"),
+                (Identifier(String::from("$1")), "$1"),
             ][..]
         );
     }
@@ -196,7 +196,7 @@ mod test {
             "\x19Ethereum Signed Message:\n47Please take my Ether and try to build Polkadot."
         "#,
         &[
-            (Identifier, "foo"),
+            (Identifier(String::from("foo")), "foo"),
             (LiteralString(String::from("\x19Ethereum Signed Message:\n47Please take my Ether and try to build Polkadot.")), 
             r#""\x19Ethereum Signed Message:\n47Please take my Ether and try to build Polkadot.""#),
         ])
@@ -299,12 +299,12 @@ mod test {
             file_path,
             &[
                 (TypeInt, "int"),
-                (Identifier, "main"),
+                (Identifier(String::from("main")), "main"),
                 (LeftParen, "("),
                 (RightParen, ")"),
                 (LeftBrace, "{"),
                 (TypeInt, "int"),
-                (Identifier, "a"),
+                (Identifier(String::from("a")), "a"),
                 (OpAssign, "="),
                 (LiteralInt(3), "3"),
                 (Semicolon, ";"),
@@ -313,15 +313,15 @@ mod test {
                 (LiteralBool(true), "true"),
                 (RightParen, ")"),
                 (LeftBrace, "{"),
-                (Identifier, "a"),
+                (Identifier(String::from("a")), "a"),
                 (OpAssign, "="),
-                (Identifier, "a"),
+                (Identifier(String::from("a")), "a"),
                 (OpPlus, "+"),
                 (LiteralInt(1), "1"),
                 (Semicolon, ";"),
                 (KeywordIf, "if"),
                 (LeftParen, "("),
-                (Identifier, "a"),
+                (Identifier(String::from("a")), "a"),
                 (OpEqual, "=="),
                 (LiteralInt(5), "5"),
                 (RightParen, ")"),

@@ -2,6 +2,11 @@
 name = "SUSTech_CS323_Project_Incredibuild"
 version = "0.1.0"
 
+[workspace]
+members = [
+    "src/lexer",
+]
+
 [dependencies]
 logos = "0.14.2"
 lalrpop = { version = "0.22.0", default-features = false }
