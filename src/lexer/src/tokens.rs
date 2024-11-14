@@ -1,3 +1,19 @@
+/* 
+    Supported Tokens:
+
+    - EndOfProgram
+    - Operators: >, <, <=, >=, ==, !=, =, +, -, *, /, %, ^, &&, ||, !, ++, -- (Start with Op)
+    - Punctuation: ., ,, :, ;, [, ], (, ), {, } 
+    - Keywords: if, else, while, for, return, break, continue (Start with Keyword)
+    - Declaration: enum, struct, fn (Start with Declaration)
+    - Type: bool, char, string, int, float, null (Start with Type)
+    - Literals: bool, float, int, char, string (Start with Literal)
+    - Identifier
+    - LineComment: //...
+    - BlockComment: /*...*/
+
+*/
+
 use logos::{Logos, FilterResult};
 use std::fmt; 
 use std::num::ParseIntError;
