@@ -1,0 +1,12 @@
+[package]
+name = "spl_parser"
+version = "0.0.1"
+edition = "2021"
+license = "GPL-3.0"
+
+[dependencies]
+spl_lexer = {version = "0.0.1", path = "../lexer"}
+lalrpop-util = "0.22.0"
+
+[build-dependencies]
+lalrpop = { version = "0.22.0", default-features = false }
