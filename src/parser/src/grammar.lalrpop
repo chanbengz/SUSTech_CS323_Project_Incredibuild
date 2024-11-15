@@ -12,6 +12,7 @@ extern {
     "int" => Token::LiteralInt(<i32>),
     "float" => Token::LiteralFloat(<f32>),
     "bool" => Token::LiteralBool(<bool>),
+    "char" => Token::LiteralChar(<char>),
     "(" => Token::LeftParen,
     ")" => Token::RightParen,
     "+" => Token::OpPlus,
@@ -19,17 +20,13 @@ extern {
     "*" => Token::OpMul,
     "/" => Token::OpDiv,
     "^" => Token::OpPow,
-    "%" => Token::OpMod
+    "%" => Token::OpMod,
   }
 }
 
 pub Expr: Box<tree::CompExpr> = {
 #[precedence(level="1")]
-    <n:Term> => {
-      Box::new(tree::CompExpr::Value(
-        *n
-      ))
-    },
+    Term,
 
 #[precedence(level="2")] #[assoc(side="left")]
     <lhs:Expr> "^" <rhs:Expr> => {
@@ -63,16 +60,18 @@ pub Expr: Box<tree::CompExpr> = {
         lhs, tree::BinaryOperator::Add, rhs
       ))
     },
+
     <lhs:Expr> "-" <rhs:Expr> => {
       Box::new(tree::CompExpr::BinaryOperation (
         lhs, tree::BinaryOperator::Sub, rhs
       ))
     },
-    "(" <Expr> ")",
-};
+}
 
-Term: Box<tree::Value> = {
-    <n: "int"> => Box::new(tree::Value::Integer(n)),
-    <n: "float"> => Box::new(tree::Value::Float(n)),
-    <n: "bool"> => Box::new(tree::Value::Bool(n)),
+Term: Box<tree::CompExpr> = {
+    <n: "int"> => Box::new(tree::CompExpr::Value(tree::Value::Integer(n))),
+    <n: "float"> => Box::new(tree::CompExpr::Value(tree::Value::Float(n))),
+    <n: "bool"> => Box::new(tree::CompExpr::Value(tree::Value::Bool(n))),
+    <n: "char"> => Box::new(tree::CompExpr::Value(tree::Value::Char(n))),
+    "(" <Expr> ")",
 }

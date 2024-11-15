@@ -23,6 +23,4 @@ impl<'input> Iterator for Lexer<'input> {
         .next()
         .map(|(token, span)| Ok((span.start, token?, span.end)))
     }
-}
-  
-  
+}  
