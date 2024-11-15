@@ -6,6 +6,7 @@ license = "GPL-3.0"
 
 [dependencies]
 spl_lexer = {version = "0.0.1", path = "../lexer"}
+spl_ast = {version = "0.0.1", path = "../ast"}
 lalrpop-util = { version = "0.21.0", features = ["unicode"] }
 
 [build-dependencies]

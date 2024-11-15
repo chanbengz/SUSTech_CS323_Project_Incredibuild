@@ -1,5 +1,5 @@
 use spl_lexer::tokens::{Token, LexicalError};
-use crate::ast;
+use spl_ast::tree;
 
 grammar;
 
@@ -10,39 +10,69 @@ extern {
   enum Token {
     "identifier" => Token::Identifier(<String>),
     "int" => Token::LiteralInt(<i32>),
+    "float" => Token::LiteralFloat(<f32>),
+    "bool" => Token::LiteralBool(<bool>),
     "(" => Token::LeftParen,
     ")" => Token::RightParen,
     "+" => Token::OpPlus,
     "-" => Token::OpMinus,
     "*" => Token::OpMul,
     "/" => Token::OpDiv,
+    "^" => Token::OpPow,
+    "%" => Token::OpMod
   }
 }
 
-pub Expr: Box<ast::Expr> = {
+pub Expr: Box<tree::CompExpr> = {
 #[precedence(level="1")]
-    Term,
-
-#[precedence(level="2")] #[assoc(side="left")]
-    <lhs:Expr> "*" <rhs:Expr> => {
-    Box::new(ast::Expr::BinaryOperation (
-      lhs, ast::Operator::Mul, rhs
-    ))
+    <n:Term> => {
+      Box::new(tree::CompExpr::Value(
+        *n
+      ))
     },
 
-    <lhs:Expr> "/" <rhs:Expr> => {
-    Box::new(ast::Expr::BinaryOperation (
-      lhs, ast::Operator::Div, rhs
-    ))
+#[precedence(level="2")] #[assoc(side="left")]
+    <lhs:Expr> "^" <rhs:Expr> => {
+      Box::new(tree::CompExpr::BinaryOperation (
+        lhs, tree::BinaryOperator::Pow, rhs
+      ))
+    },
+
+    <lhs:Expr> "%" <rhs:Expr> => {
+      Box::new(tree::CompExpr::BinaryOperation (
+        lhs, tree::BinaryOperator::Mod, rhs
+      ))
     },
 
 #[precedence(level="3")] #[assoc(side="left")]
-    <lhs:Expr> "+" <rhs:Term> => Box::new(ast::Expr::BinaryOperation (
-        lhs, ast::Operator::Add, rhs
-    )),
+    <lhs:Expr> "*" <rhs:Expr> => {
+      Box::new(tree::CompExpr::BinaryOperation (
+        lhs, tree::BinaryOperator::Mul, rhs
+      ))
+    },
+
+    <lhs:Expr> "/" <rhs:Expr> => {
+      Box::new(tree::CompExpr::BinaryOperation (
+        lhs, tree::BinaryOperator::Div, rhs
+      ))
+    },
+
+#[precedence(level="4")] #[assoc(side="left")]
+    <lhs:Expr> "+" <rhs:Expr> => {
+      Box::new(tree::CompExpr::BinaryOperation (
+        lhs, tree::BinaryOperator::Add, rhs
+      ))
+    },
+    <lhs:Expr> "-" <rhs:Expr> => {
+      Box::new(tree::CompExpr::BinaryOperation (
+        lhs, tree::BinaryOperator::Sub, rhs
+      ))
+    },
     "(" <Expr> ")",
 };
 
-Term: Box<ast::Expr> = {
-    <n: "int"> => Box::new(ast::Expr::Integer(n)),
+Term: Box<tree::Value> = {
+    <n: "int"> => Box::new(tree::Value::Integer(n)),
+    <n: "float"> => Box::new(tree::Value::Float(n)),
+    <n: "bool"> => Box::new(tree::Value::Bool(n)),
 }
