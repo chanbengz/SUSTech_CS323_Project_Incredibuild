@@ -49,6 +49,7 @@ impl fmt::Display for CompExpr {
             CompExpr::Variable(var) => write!(f, "{}", var),
             CompExpr::UnaryOperation(op, expr) => write!(f, "({} {})", op, expr),
             CompExpr::BinaryOperation(left, op, right) => write!(f, "({} {} {})", left, op, right),
+            CompExpr::Error => write!(f, "Error: Missing Term"),
         }
     }
 }

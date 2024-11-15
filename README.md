@@ -16,17 +16,22 @@ docker build -t incredibuild .
 
 If you face network issue, you can use two methods to fix it.
 1. Modify `/etc/systemd/system/docker.service.d/http-proxy.conf` to add proxy.
+
     ```conf
     [Service]
     Environment="HTTP_PROXY=http://your-proxy:port"
     Environment="HTTPS_PROXY=http://your-proxy:port"
     ```
+
     Then restart docker service.
+
     ```bash
     sudo systemctl daemon-reload
     sudo systemctl restart docker
     ```
+
 2. Add Registry Mirror in `/etc/docker/daemon.json`.
+
     ```json
     {
         "registry-mirrors": ["<your-mirror>"]

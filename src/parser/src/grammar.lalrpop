@@ -1,7 +1,8 @@
 use spl_lexer::tokens::{Token, LexicalError};
 use spl_ast::tree;
+use lalrpop_util::ErrorRecovery;
 
-grammar;
+grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token, LexicalError>>);
 
 extern {
   type Location = usize;
@@ -74,4 +75,5 @@ Term: Box<tree::CompExpr> = {
     <n: "bool"> => Box::new(tree::CompExpr::Value(tree::Value::Bool(n))),
     <n: "char"> => Box::new(tree::CompExpr::Value(tree::Value::Char(n))),
     "(" <Expr> ")",
+    ! => { errors.push(<>); Box::new(tree::CompExpr::Error) },
 }
