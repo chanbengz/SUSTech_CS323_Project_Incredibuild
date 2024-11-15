@@ -45,10 +45,10 @@ impl fmt::Display for Function {
 impl fmt::Display for CompExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CompExpr::Value(val) => write!(f, "Value: {}", val),
-            CompExpr::Variable(var) => write!(f, "Variable: {}", var),
-            CompExpr::UnaryOperation(op, expr) => write!(f, "Unary Operation: {} {}", op, expr),
-            CompExpr::BinaryOperation(left, op, right) => write!(f, "Binary Operation: ({}) {} ({})", left, op, right),
+            CompExpr::Value(val) => write!(f, "{}", val),
+            CompExpr::Variable(var) => write!(f, "{}", var),
+            CompExpr::UnaryOperation(op, expr) => write!(f, "({} {})", op, expr),
+            CompExpr::BinaryOperation(left, op, right) => write!(f, "({} {} {})", left, op, right),
         }
     }
 }
@@ -73,11 +73,11 @@ impl fmt::Display for CondExpr {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Integer(i) => write!(f, "Integer: {}", i),
-            Value::Float(fl) => write!(f, "{}", fl),
-            Value::String(s) => write!(f, "String: {}", s),
-            Value::Char(c) => write!(f, "Char: {}", c),
-            Value::Bool(b) => write!(f, "Bool: {}", b),
+            Value::Integer(i) => write!(f, "{}: i32", i),
+            Value::Float(fl) => write!(f, "{}: f32", fl),
+            Value::String(s) => write!(f, "{}: String", s),
+            Value::Char(c) => write!(f, "{}: char", c),
+            Value::Bool(b) => write!(f, "{}: bool", b),
         }
     }
 }

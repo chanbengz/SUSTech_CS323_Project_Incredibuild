@@ -16,7 +16,7 @@ mod tests {
         let lexer = spl_lexer::lexer::Lexer::new(&source_code);
         let parser = ExprParser::new();
         let ast = parser.parse(lexer).unwrap();
-        assert_eq!(format!("{}", ast), "((4 * 5) + 2)");
+        assert_eq!(format!("{}", ast), "((4: i32 * 5: i32) + 2: i32)");
     }
 }
 
