@@ -14,6 +14,8 @@ extern {
     "float" => Token::LiteralFloat(<f32>),
     "bool" => Token::LiteralBool(<bool>),
     "char" => Token::LiteralChar(<char>),
+    "typeint" => Token::TypeInt,
+    "typefloat" => Token::TypeFloat,
     "(" => Token::LeftParen,
     ")" => Token::RightParen,
     "+" => Token::OpPlus,
@@ -25,44 +27,44 @@ extern {
   }
 }
 
-pub Expr: Box<tree::CompExpr> = {
+pub CompExpr: Box<tree::CompExpr> = {
 #[precedence(level="1")]
     Term,
 
 #[precedence(level="2")] #[assoc(side="left")]
-    <lhs:Expr> "^" <rhs:Expr> => {
+    <lhs:CompExpr> "^" <rhs:CompExpr> => {
       Box::new(tree::CompExpr::BinaryOperation (
         lhs, tree::BinaryOperator::Pow, rhs
       ))
     },
 
-    <lhs:Expr> "%" <rhs:Expr> => {
+    <lhs:CompExpr> "%" <rhs:CompExpr> => {
       Box::new(tree::CompExpr::BinaryOperation (
         lhs, tree::BinaryOperator::Mod, rhs
       ))
     },
 
 #[precedence(level="3")] #[assoc(side="left")]
-    <lhs:Expr> "*" <rhs:Expr> => {
+    <lhs:CompExpr> "*" <rhs:CompExpr> => {
       Box::new(tree::CompExpr::BinaryOperation (
         lhs, tree::BinaryOperator::Mul, rhs
       ))
     },
 
-    <lhs:Expr> "/" <rhs:Expr> => {
+    <lhs:CompExpr> "/" <rhs:CompExpr> => {
       Box::new(tree::CompExpr::BinaryOperation (
         lhs, tree::BinaryOperator::Div, rhs
       ))
     },
 
 #[precedence(level="4")] #[assoc(side="left")]
-    <lhs:Expr> "+" <rhs:Expr> => {
+    <lhs:CompExpr> "+" <rhs:CompExpr> => {
       Box::new(tree::CompExpr::BinaryOperation (
         lhs, tree::BinaryOperator::Add, rhs
       ))
     },
 
-    <lhs:Expr> "-" <rhs:Expr> => {
+    <lhs:CompExpr> "-" <rhs:CompExpr> => {
       Box::new(tree::CompExpr::BinaryOperation (
         lhs, tree::BinaryOperator::Sub, rhs
       ))
@@ -74,6 +76,6 @@ Term: Box<tree::CompExpr> = {
     <n: "float"> => Box::new(tree::CompExpr::Value(tree::Value::Float(n))),
     <n: "bool"> => Box::new(tree::CompExpr::Value(tree::Value::Bool(n))),
     <n: "char"> => Box::new(tree::CompExpr::Value(tree::Value::Char(n))),
-    "(" <Expr> ")",
+    "(" <CompExpr> ")",
     ! => { errors.push(<>); Box::new(tree::CompExpr::Error) },
 }
