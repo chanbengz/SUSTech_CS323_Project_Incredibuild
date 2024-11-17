@@ -73,7 +73,19 @@ mod tests {
     #[test]
     fn test_if() {
         // Test if statement
-        assert_funcdec_parse("int func(int a, int b) { if (a > b) { return a; } else { return b; } }", "Function: func:[Body: [If: Condition: a > b then Body: [Return: a] else Body: [Return: b]]]");
+        assert_funcdec_parse("
+            int main(){
+                int a = 3;
+                while (true){
+                    a = a + 1;
+                    if (a == 5){
+                        break;
+                    }
+                }
+                return;
+            }
+        ", "Function: main:[Body: [Assignment: Variable Declaration: a = [0: i32] with dimensions [] = 3: i32, While Loop (Condition: true): \n do Body: [Assignment: a = (a + 1: i32), If: Condition: a == 5: i32 then Body: [Break]], Return: null]]");
     }
+
 }
 
