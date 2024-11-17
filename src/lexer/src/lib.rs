@@ -6,42 +6,6 @@ pub use tokens::Token;
 pub use logos::{Logos, Lexer, Source};
 pub use std::fs::File;
 
-// #[inline]
-// pub fn read_pragma<'source>(lex: &mut Lexer<Token>) -> S::Slice {
-//     use logos::internal::LexerInternal;
-
-//     loop {
-//         match lex.read() {
-//             0x01...0x20 => lex.bump(),
-//             _           => break,
-//         }
-//     }
-
-//     let start = lex.range().start;
-
-//     loop {
-//         match lex.read() {
-//             0 => {
-//                 lex.token = Token::UnexpectedEndOfProgram;
-//                 let end = lex.range().end;
-
-//                 return lex.source.slice(start..end).expect("0 guarantees being at the end; qed");
-//             },
-//             b';' => {
-//                 let end = lex.range().end;
-
-//                 let version = lex.source.slice(start..end).expect("Still within bounds; qed");
-
-//                 lex.token = Token::Semicolon;
-//                 lex.bump();
-
-//                 return version;
-//             },
-//             _ => lex.bump(),
-//         }
-//     }
-// }
-
 
 #[cfg(test)]
 mod test {

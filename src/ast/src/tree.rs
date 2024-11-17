@@ -1,7 +1,10 @@
 #[derive(Clone, Debug, PartialEq)]
-pub enum Program {
-    Statements(Box<Vec<Statement>>),
-    Functions(Box<Vec<Function>>)
+pub struct Program(pub Vec<ProgramPart>);
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ProgramPart {
+    Statement(Box<Statement>),
+    Function(Box<Function>)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -17,7 +20,8 @@ pub enum Statement {
 pub enum Variable {
     // The last one is for the dimension list, if null than a value only.
     // (identifier, values, dimensions)
-    VarDeclaration(Box<String>, Box<Vec<Value>>, Box<Vec<usize>>)
+    VarDeclaration(Box<String>, Box<Vec<Value>>, Box<Vec<usize>>),
+    FormalParameter(Box<String>, Box<Vec<Value>>, Box<Vec<usize>>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -59,6 +63,7 @@ pub enum Value {
     String(String),
     Char(char),
     Bool(bool),
+    Null
 }
 
 #[derive(Clone, Debug, PartialEq)]

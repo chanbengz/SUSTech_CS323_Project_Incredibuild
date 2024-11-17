@@ -1,13 +1,11 @@
 use std::fmt;
 use crate::tree::*;
 
-impl fmt::Display for Program {
+impl fmt::Display for ProgramPart {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Program::Statements(statements) => write!(f, "Statements: [{}]", 
-                statements.iter().map(|stmt| format!("{}", stmt)).collect::<Vec<String>>().join(", ")),
-            Program::Functions(functions) => write!(f, "Functions: [{}]", 
-                functions.iter().map(|func| format!("{}", func)).collect::<Vec<String>>().join(", ")),
+            ProgramPart::Statement(statement) => write!(f, "Statement: {}", statement),
+            ProgramPart::Function(function) => write!(f, "Functions: {}", function),
         }
     }
 }
@@ -27,6 +25,10 @@ impl fmt::Display for Variable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Variable::VarDeclaration(ident, values, dims) => write!(f, "Variable Declaration: {} = [{}] with dimensions [{}]", 
+                ident, 
+                values.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", "), 
+                dims.iter().map(|d| d.to_string()).collect::<Vec<String>>().join(", ")),
+            Variable::FormalParameter(ident, values, dims) => write!(f, "Formal Parameter: {} = [{}] with dimensions [{}]", 
                 ident, 
                 values.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", "), 
                 dims.iter().map(|d| d.to_string()).collect::<Vec<String>>().join(", ")),
@@ -79,6 +81,7 @@ impl fmt::Display for Value {
             Value::String(s) => write!(f, "{}: String", s),
             Value::Char(c) => write!(f, "{}: char", c),
             Value::Bool(b) => write!(f, "{}: bool", b),
+            Value::Null => write!(f, "null"),
         }
     }
 }

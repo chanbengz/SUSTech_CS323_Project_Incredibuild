@@ -10,6 +10,7 @@ extern {
 
   enum Token {
     "identifier" => Token::Identifier(<String>),
+    "," => Token::Comma,
     "int" => Token::LiteralInt(<i32>),
     "float" => Token::LiteralFloat(<f32>),
     "bool" => Token::LiteralBool(<bool>),
@@ -25,6 +26,42 @@ extern {
     "^" => Token::OpPow,
     "%" => Token::OpMod,
   }
+}
+
+// pub Program: Program = {
+//     <prg:ProgramPart*> => prg
+// }
+
+// ProgramPart: tree::Program = {
+// 
+// }
+
+pub ParaDecs = Comma<ParaDec>;
+
+Comma<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
+ParaDec: Box<tree::Variable> = {
+    <spec:Specifier> <name:"identifier"> => {
+        let mut values = Vec::new();
+        values.push(spec);
+        Box::new(tree::Variable::FormalParameter(
+            Box::new(name),
+            Box::new(values),
+            Box::new(Vec::new())
+        ))
+    }
+}
+
+Specifier: tree::Value = {
+    <t:"typeint"> => tree::Value::Integer(0),
 }
 
 pub CompExpr: Box<tree::CompExpr> = {
