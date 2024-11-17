@@ -10,21 +10,60 @@ extern {
 
   enum Token {
     "identifier" => Token::Identifier(<String>),
-    "," => Token::Comma,
+    
     "int" => Token::LiteralInt(<i32>),
     "float" => Token::LiteralFloat(<f32>),
     "bool" => Token::LiteralBool(<bool>),
     "char" => Token::LiteralChar(<char>),
+    "string" => Token::LiteralString(<String>),
     "typeint" => Token::TypeInt,
     "typefloat" => Token::TypeFloat,
+    "typebool" => Token::TypeBool,
+    "typechar" => Token::TypeChar,
+    "typestr" => Token::TypeString,
+    "void" => Token::TypeVoid,
+    "null" => Token::TypeNull,
+
     "(" => Token::LeftParen,
     ")" => Token::RightParen,
+    "{" => Token::LeftBrace,
+    "}" => Token::RightBrace,
+    "[" => Token::LeftBracket,
+    "]" => Token::RightBracket,
+    "." => Token::Dot,
+    "," => Token::Comma,
+    ";" => Token::Semicolon,
+    ":" => Token::Colon,
+
     "+" => Token::OpPlus,
     "-" => Token::OpMinus,
     "*" => Token::OpMul,
     "/" => Token::OpDiv,
     "^" => Token::OpPow,
     "%" => Token::OpMod,
+    ">" => Token::OpGreaterThan,
+    "<" => Token::OpLessThan,
+    ">=" => Token::OpGreaterThanEqual,
+    "<=" => Token::OpLessThanEqual,
+    "==" => Token::OpEqual,
+    "!=" => Token::OpNotEqual,
+    "&&" => Token::OpAnd,
+    "||" => Token::OpOr,
+    "!" => Token::OpNot,
+    "=" => Token::OpAssign,
+    "++" => Token::OpIncrement,
+    "--" => Token::OpDecrement,
+
+    "if" => Token::KeywordIf,
+    "else" => Token::KeywordElse,
+    "while" => Token::KeywordWhile,
+    "for" => Token::KeywordFor,
+    "return" => Token::KeywordReturn,
+    "break" => Token::KeywordBreak,
+    "continue" => Token::KeywordContinue,
+
+    "enum" => Token::DeclarationEnum,
+    "struct" => Token::DeclarationStruct,
   }
 }
 
@@ -36,7 +75,23 @@ extern {
 // 
 // }
 
+pub FuncDec: Box<tree::Function> = {
+    <ret: Specifier> <name:"identifier"> "(" <params:ParaDecs> ")" "{" <body:Body> "}" => {
+        Box::new(tree::Function::FuncDeclaration(
+            Box::new(name),
+            Box::new(params),
+            Box::new(ret),
+            body
+        ))
+    }
+}
+
+pub Body: tree::Body = {
+    <stmt:Stmt*> => tree::Body::Body(stmt)
+}
+
 pub ParaDecs = Comma<ParaDec>;
+pub ArgList = Comma<CompExpr>;
 
 Comma<T>: Vec<T> = {
     <mut v:(<T> ",")*> <e:T?> => match e {
@@ -48,20 +103,199 @@ Comma<T>: Vec<T> = {
     }
 };
 
-ParaDec: Box<tree::Variable> = {
+Stmt: tree::Expr = {
+    <expr:AssignExpr> => expr,
+    <expr:IfExpr> => expr,
+    <expr:WhileExpr> => expr,
+    <expr:ForExpr> => expr,
+    <expr:VarDec> => expr,
+    <expr:FuncCall> => expr,
+    <expr:"break"> ";" => tree::Expr::Break,
+    <expr:"continue"> ";" => tree::Expr::Continue,
+    <expr:"return"> <val:CompExpr?> ";" => match val {
+        None => tree::Expr::Return(tree::CompExpr::Value(tree::Value::Null)),
+        Some(val) => tree::Expr::Return(*val)
+    }
+}
+
+FuncCall: tree::Expr = {
+    <name:"identifier"> "(" <args:ArgList> ")" => {
+        tree::Expr::FuncCall(
+            tree::Function::FuncReference(
+                Box::new(name),
+                Box::new(args)
+            )
+        )
+    }
+}
+
+IfExpr: tree::Expr = {
+    "if" "(" <cond:CondExpr> ")" "{" <body:Body> "}" => {
+        tree::Expr::If(
+            tree::If::IfExpr(
+                cond,
+                body
+            )
+        )
+    },
+    "if" "(" <cond:CondExpr> ")" "{" <body:Body> "}" "else" "{" <body_2:Body> "}" => {
+        tree::Expr::If(
+            tree::If::IfElseExpr(
+                cond,
+                body, 
+                body_2
+            )
+        )
+    }
+}
+
+WhileExpr: tree::Expr = {
+    "while" "(" <cond:CondExpr> ")" "{" <body:Body> "}" => {
+        tree::Expr::Loop(
+            tree::Loop::WhileExpr(
+                cond,
+                body
+            )
+        )
+    }
+}
+
+ForExpr: tree::Expr = {
+    "for" "(" <init:AssignExpr> ";" <cond:CondExpr> ";" <update:AssignExpr> ")" "{" <body:Body> "}" => {
+        tree::Expr::Loop(
+            tree::Loop::ForExpr(
+                Box::new(init),
+                cond,
+                Box::new(update),
+                body
+            )
+        )
+    }
+}
+
+AssignExpr: tree::Expr = {
+    /* Four types of assignment:
+     * 1. Specifier identifier = CompExpr;
+     * 2. identifier = CompExpr;
+     * 3. Specifier identifier = Valuer;
+     * 4. identifier = Valuer;
+     * 5. identifier++;
+     * 6. identifier--;
+    */
+    <spec:Specifier> <lhs:"identifier"> "=" <rhs:CompExpr> ";" => {
+        let mut values = Vec::new();
+        values.push(spec);
+        tree::Expr::Assign(
+            tree::AssignExpr::AssignOperation(
+                Box::new(tree::Variable::VarDeclaration(
+                    Box::new(lhs),
+                    Box::new(values),
+                    Box::new(Vec::new())
+                )),
+                rhs
+            )
+        )  
+    },
+    <lhs:"identifier"> "=" <rhs:CompExpr> ";" => {
+        tree::Expr::Assign(
+            tree::AssignExpr::AssignOperation(
+                Box::new(tree::Variable::VarReference(Box::new(lhs))),
+                rhs
+            )
+        )
+    },
+    <lhs:"identifier"> "++" ";" => {
+        tree::Expr::Assign(
+            tree::AssignExpr::AssignOperation(
+                Box::new(tree::Variable::VarReference(Box::new(lhs))),
+                Box::new(tree::CompExpr::Value(tree::Value::Integer(1)))
+            )
+        )
+    },
+    <lhs:"identifier"> "--" ";" => {
+        tree::Expr::Assign(
+            tree::AssignExpr::AssignOperation(
+                Box::new(tree::Variable::VarReference(Box::new(lhs))),
+                Box::new(tree::CompExpr::Value(tree::Value::Integer(-1)))
+            )
+        )
+    },
+}
+
+VarDec: tree::Expr = {
+    <spec: Specifier> <ident: "identifier"> ";" => {
+        tree::Expr::VarDec(
+            tree::Variable::VarDeclaration(
+                Box::new(ident),
+                Box::new(vec![spec]),
+                Box::new(Vec::new())
+            )
+        )
+    }
+}
+
+
+
+ParaDec: tree::Variable = {
     <spec:Specifier> <name:"identifier"> => {
         let mut values = Vec::new();
         values.push(spec);
-        Box::new(tree::Variable::FormalParameter(
+        tree::Variable::FormalParameter(
             Box::new(name),
             Box::new(values),
             Box::new(Vec::new())
-        ))
+        )
     }
 }
 
 Specifier: tree::Value = {
     <t:"typeint"> => tree::Value::Integer(0),
+    <t:"typefloat"> => tree::Value::Float(0.0),
+    <t:"typebool"> => tree::Value::Bool(false),
+    <t:"typechar"> => tree::Value::Char(' '),
+    <t:"typestr"> => tree::Value::String(String::new()),
+    <t:"void"> => tree::Value::Null,
+}
+
+CondExpr: Box<tree::CondExpr> = {
+    <lhs:CompExpr> ">" <rhs:CompExpr> => {
+        Box::new(tree::CondExpr::Condition(
+            lhs, tree::JudgeOperator::GT, rhs
+        ))
+    },
+    <lhs:CompExpr> "<" <rhs:CompExpr> => {
+        Box::new(tree::CondExpr::Condition(
+            lhs, tree::JudgeOperator::LT, rhs
+        ))
+    },
+    <lhs:CompExpr> ">=" <rhs:CompExpr> => {
+        Box::new(tree::CondExpr::Condition(
+            lhs, tree::JudgeOperator::GE, rhs
+        ))
+    },
+    <lhs:CompExpr> "<=" <rhs:CompExpr> => {
+        Box::new(tree::CondExpr::Condition(
+            lhs, tree::JudgeOperator::LE, rhs
+        ))
+    },
+    <lhs:CompExpr> "==" <rhs:CompExpr> => {
+        Box::new(tree::CondExpr::Condition(
+            lhs, tree::JudgeOperator::EQ, rhs
+        ))
+    },
+    <lhs:CompExpr> "!=" <rhs:CompExpr> => {
+        Box::new(tree::CondExpr::Condition(
+            lhs, tree::JudgeOperator::NE, rhs
+        ))
+    },
+    "!" <expr:CompExpr> => {
+        Box::new(tree::CondExpr::UnaryCondition(
+            tree::UnaryOperator::Not, expr
+        ))
+    },
+    <expr:CompExpr> => {
+        Box::new(tree::CondExpr::Bool(true))
+    }
 }
 
 pub CompExpr: Box<tree::CompExpr> = {
@@ -109,6 +343,7 @@ pub CompExpr: Box<tree::CompExpr> = {
 }
 
 Term: Box<tree::CompExpr> = {
+    <n: "identifier"> => Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(n)))),
     <n: "int"> => Box::new(tree::CompExpr::Value(tree::Value::Integer(n))),
     <n: "float"> => Box::new(tree::CompExpr::Value(tree::Value::Float(n))),
     <n: "bool"> => Box::new(tree::CompExpr::Value(tree::Value::Bool(n))),
@@ -116,3 +351,5 @@ Term: Box<tree::CompExpr> = {
     "(" <CompExpr> ")",
     ! => { errors.push(<>); Box::new(tree::CompExpr::Error) },
 }
+
+
