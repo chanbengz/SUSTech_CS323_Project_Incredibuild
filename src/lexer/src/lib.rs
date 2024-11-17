@@ -301,4 +301,40 @@ mod test {
             ][..]
         );
     }
+
+    #[test]
+    fn test() {
+        let source = r#"
+            int func(int a, int b) { if (a > b) { return a; } else { return b; } }"#;
+       assert_lex(source, &[
+            (TypeInt, "int"),
+            (Identifier(String::from("func")), "func"),
+            (LeftParen, "("),
+            (TypeInt, "int"),
+            (Identifier(String::from("a")), "a"),
+            (Comma, ","),
+            (TypeInt, "int"),
+            (Identifier(String::from("b")), "b"),
+            (RightParen, ")"),
+            (LeftBrace, "{"),
+            (KeywordIf, "if"),
+            (LeftParen, "("),
+            (Identifier(String::from("a")), "a"),
+            (OpGreaterThan, ">"),
+            (Identifier(String::from("b")), "b"),
+            (RightParen, ")"),
+            (LeftBrace, "{"),
+            (KeywordReturn, "return"),
+            (Identifier(String::from("a")), "a"),
+            (Semicolon, ";"),
+            (RightBrace, "}"),
+            (KeywordElse, "else"),
+            (LeftBrace, "{"),
+            (KeywordReturn, "return"),
+            (Identifier(String::from("b")), "b"),
+            (Semicolon, ";"),
+            (RightBrace, "}"),
+            (RightBrace, "}"),
+        ]);
+    }
 }

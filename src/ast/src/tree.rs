@@ -20,14 +20,16 @@ pub enum Statement {
 pub enum Variable {
     // The last one is for the dimension list, if null than a value only.
     // (identifier, values, dimensions)
+    VarReference(Box<String>),
     VarDeclaration(Box<String>, Box<Vec<Value>>, Box<Vec<usize>>),
     FormalParameter(Box<String>, Box<Vec<Value>>, Box<Vec<usize>>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Function {
-    // (identifier, input_params, params_num)
-    FuncDeclaration(Box<String>, Box<Vec<Variable>>, Box<usize>)
+    // (identifier, input_params, output_params, body)
+    FuncReference(Box<String>, Box<Vec<Box<CompExpr>>>),
+    FuncDeclaration(Box<String>, Box<Vec<Variable>>, Box<Value>, Body),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -47,13 +49,14 @@ pub enum CompExpr {
 pub enum AssignExpr {
     // When assigning must check whether the variable already
     // exists 
-    AssignOperation(Variable, CompExpr)
+    AssignOperation(Box<Variable>, Box<CompExpr>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CondExpr {
     Bool(bool),
-    Condition(Box<Expr>, JudgeOperator, Box<Expr>)
+    UnaryCondition(UnaryOperator, Box<CompExpr>),
+    Condition(Box<CompExpr>, JudgeOperator, Box<CompExpr>)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -97,25 +100,29 @@ pub enum JudgeOperator {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum If {
-    IfExpr(CondExpr, Body, Option<Body>)
+    IfExpr(Box<CondExpr>, Body),
+    IfElseExpr(Box<CondExpr>, Body, Body)
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Loop {
-    LoopExpr(CondExpr, Body)
+    WhileExpr(Box<CondExpr>, Body),
+    ForExpr(Box<Expr>, Box<CondExpr>, Box<Expr>, Body)
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Body {
-    Body(Box<Vec<Expr>>)
+    Body(Vec<Expr>)
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr{
     If(If),
     Loop(Loop),
+    VarDec(Variable),
     Assign(AssignExpr),
-    Break(),
+    FuncCall(Function),
+    Break,
     Continue,
-    Return(Option<Value>)
+    Return(CompExpr)
 }

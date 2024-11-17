@@ -147,6 +147,8 @@ pub enum Token {
     TypeFloat,
     #[token("null")]
     TypeNull,
+    #[token("void")]
+    TypeVoid,
 
     // Literals
     #[regex("true|false", |lex| lex.slice() == "true")]
