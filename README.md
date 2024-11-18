@@ -6,7 +6,16 @@ C-like Compiler in Rust
 
 </div>
 
-## Build up the project
+This project is still under development.
+
+## Features
+
+- [ ] SPL Grammar:
+    - [ ] Lexer & Parser
+    - [ ] Semantic Analyzer
+    - [ ] Macro
+
+## Development
 
 Setting up environment might be a stuggling process, you can use `docker` to build up the environment.
 
@@ -14,7 +23,23 @@ Setting up environment might be a stuggling process, you can use `docker` to bui
 docker build -t incredibuild .
 ```
 
-If you face network issue, you can use two methods to fix it.
+You can also choose to download the image we have already built from Docker Hub.
+
+```bash
+docker pull jaredanjerry/incredibuild:20241106 # Approximately 4.5GB
+```
+
+After building the project, you can set up the project by running an iteractive shell in the container. (Please mount the project root path to `/incredibuild`)
+
+```bash
+cd <project-root-path>
+docker run -it --rm -v $(pwd):/incredibuild incredibuild
+cargo run
+```
+
+## Issue
+If you face network issue, there'are two methods to fix it.
+
 1. Modify `/etc/systemd/system/docker.service.d/http-proxy.conf` to add proxy.
 
     ```conf
@@ -38,18 +63,8 @@ If you face network issue, you can use two methods to fix it.
     }
     ```
 
-You can also choose to download the image we have already built from Docker Hub.
+## Reference
 
-```bash
-docker pull jaredanjerry/incredibuild:20241106 # Approximately 4.5GB
-```
-
-## Set up the project
-
-After building the project, you can set up the project by running an iteractive shell in the container. (Please mount the project root path to `/incredibuild`)
-
-```bash
-cd <project-root-path>
-docker run -it --rm -v $(pwd):/incredibuild incredibuild
-cargo run
-```
+- [llvm@17](https://llvm.org/)
+- [lalrpop](https://github.com/lalrpop/lalrpop)
+- [Logos](https://github.com/maciejhirsz/logos)
