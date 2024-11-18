@@ -15,28 +15,32 @@ pub enum Statement {
     // Statement includes Macro, however, macro 
     // requires special management.
     Include(Box<String>), 
-    GlobalVariable(Variable),
-    Struct(Box<String>, Box<Vec<Variable>>),
+    GlobalVariable(Vec<Variable>),
+    Struct(Variable),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Variable {
     // The last one is for the dimension list, if null than a value only.
     // (identifier, values, dimensions)
+    // Variable can be used to declare a variable or reference a variable.
+    // Variable can be a single value or an array.
     VarReference(Box<String>),
-    MemberReference(Box<String>, Box<String>),
     VarDeclaration(Box<String>, Box<Vec<Value>>, Box<Vec<usize>>),
+    VarAssignment(Box<String>, Box<CompExpr>),
+
+    // Struct is defined to realize object.
+    StructReference(Box<String>),
+    StructDefinition(Box<String>, Box<Vec<Variable>>),
+    // Object type, Identifier, Variables
+    StructDeclaration(Box<String>, Box<String>, Box<Vec<Variable>>),
+    // Identifier, Field, Variable
+    StructAssignment(Box<String>, Box<String>, Box<CompExpr>),
+
+    MemberReference(Box<String>, Box<String>),
     FormalParameter(Box<String>, Box<Vec<Value>>, Box<Vec<usize>>),
     Error
 }
-
-// #[derive(Clone, Debug, PartialEq)]
-// pub enum Object {
-//     StructReference(Box<String>, Box<Vec<Variable>>, Box<Vec<usize>>),
-//     StructDeclaration(Box<String>, Box<Vec<Variable>>),
-//     FormalParameter(Box<String>, Box<Vec<Variable>>, Box<Vec<usize>>),
-//     Error
-// }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Function {
@@ -57,14 +61,6 @@ pub enum CompExpr {
     UnaryOperation(UnaryOperator, Box<CompExpr>),
     // Binary Operator can operate on all types of Values.
     BinaryOperation(Box<CompExpr>, BinaryOperator, Box<CompExpr>),
-    Error
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum AssignExpr {
-    // When assigning must check whether the variable already
-    // exists 
-    AssignOperation(Box<Variable>, Box<CompExpr>),
     Error
 }
 
@@ -143,8 +139,7 @@ pub enum Body {
 pub enum Expr{
     If(If),
     Loop(Loop),
-    VarDec(Variable),
-    Assign(AssignExpr),
+    VarManagement(Vec<Variable>),
     FuncCall(Function),
     Break,
     Continue,

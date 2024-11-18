@@ -15,6 +15,7 @@
 */
 
 use logos::{Logos, FilterResult};
+use core::error;
 use std::fmt; 
 use std::num::ParseIntError;
 
