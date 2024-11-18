@@ -53,7 +53,7 @@ mod tests {
     #[test]
     fn test_error_recovery() {
         assert_compexpr_parse("2 + * 5", "(2: i32 + (MissingTermError * 5: i32))");
-        assert_compexpr_parse("2 + 5 *", "(2: i32 + (5: i32 * MissingTermError))");
+        assert_compexpr_parse("2 + * 5 *", "(2: i32 + ((MissingTermError * 5: i32) * MissingTermError))");
     }
 
     #[test]

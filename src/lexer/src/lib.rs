@@ -247,19 +247,8 @@ mod test {
 
     #[test]
     fn synthesis_test() {
-        let file_path = "../test/test.spl";
-        /*
-            int main(){
-                int a = 3;
-                while (true){
-                    a = a + 1;
-                    if (a == 5){
-                        break;
-                    }
-                }
-                return;
-            }
-         */
+        let file_path = "../test/test_0_r00.spl";
+
         assert_lex_from_file(
             file_path,
             &[
@@ -303,7 +292,7 @@ mod test {
     }
 
     #[test]
-    fn test() {
+    fn test_func() {
         let source = r#"
             int func(int a, int b) { if (a > b) { return a; } else { return b; } }"#;
        assert_lex(source, &[
