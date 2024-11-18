@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn test_1_r02() {
         assert_parse_from_file(Parser::ProgramParser, "../test/test_1_r02.spl", 
-        "Statement: GlobalVariable: [Variable Declaration: global = [0: i32] with dimensions []], Statement: Struct: Struct Definition: my_struct with [Variable Declaration: code = [0: i32] with dimensions [], Variable Declaration: data = [ : char] with dimensions []], Functions: Function: test_1_r02:[Body: [Struct Declaration: my_struct extends obj with [], Struct Assignment: obj.code = global, Variable Assignment: global = (global + 1: i32)]]"
+        "Statement: GlobalVariable: [Variable Declaration: global = [0: i32] with dimensions []], Statement: Struct: Struct Definition: my_struct with [Variable Declaration: code = [0: i32] with dimensions [], Variable Declaration: data = [ : char] with dimensions []], Functions: Function: test_1_r02:[Body: [Struct Declaration: my_struct extends obj with [], Struct Assignment: obj.code = global, Variable Assignment: global = (global + 1: i32)]]");
     }
 
     // #[test]
