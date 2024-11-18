@@ -133,6 +133,8 @@ pub enum Token {
     DeclarationStruct,
     #[token("fn")]
     DeclarationFunction,
+    #[token("#include")]
+    DeclarationInclude,
 
     // Type
     #[token("bool")]

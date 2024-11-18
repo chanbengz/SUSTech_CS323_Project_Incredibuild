@@ -64,30 +64,21 @@ extern {
 
     "enum" => Token::DeclarationEnum,
     "struct" => Token::DeclarationStruct,
+    "include" => Token::DeclarationInclude,
   }
 }
 
-// pub Program: Program = {
-//     <prg:ProgramPart*> => prg
-// }
-
-// ProgramPart: tree::Program = {
-// 
-// }
-
-pub FuncDec: Box<tree::Function> = {
-    <ret: Specifier> <name:"identifier"> "(" <params:ParaDecs> ")" "{" <body:Body> "}" => {
-        Box::new(tree::Function::FuncDeclaration(
-            Box::new(name),
-            Box::new(params),
-            Box::new(ret),
-            body
-        ))
+pub Program: tree::Program = {
+    <prg:ProgramPart*> => {
+        tree::Program::Program(
+            prg
+        )
     }
 }
 
-pub Body: tree::Body = {
-    <stmt:Stmt*> => tree::Body::Body(stmt)
+ProgramPart: tree::ProgramPart = {
+    <stmt: Stmt> => tree::ProgramPart::Statement(Box::new(stmt)),
+    <func: FuncDec> => tree::ProgramPart::Function(func)
 }
 
 pub ParaDecs = Comma<ParaDec>;
@@ -103,8 +94,51 @@ Comma<T>: Vec<T> = {
     }
 };
 
-Stmt: tree::Expr = {
-    <expr:AssignExpr> => expr,
+pub Stmt: tree::Statement = {
+    "struct" <name:"identifier"> "{" <fields:VarDec*> "}" ";" => {
+        tree::Statement::Struct(
+            Box::new(name),
+            Box::new(fields.into_iter().map(|x| {
+                match x {
+                    tree::Expr::VarDec(v) => v,
+                    _ => panic!("Invalid struct field")
+                }
+            }).collect())
+        )
+    },
+    "include" <name:"string"> ";" => {
+        tree::Statement::Include(
+            Box::new(name)
+        )
+    },
+    <global: VarDec> => {
+        tree::Statement::GlobalVariable({
+            match global {
+                tree::Expr::VarDec(v) => v,
+                _ => panic!("Invalid global variable")
+            }
+        })
+    },
+
+}
+
+pub FuncDec: Box<tree::Function> = {
+    <ret: Specifier> <name:"identifier"> "(" <params:ParaDecs> ")" "{" <body:Body> "}" => {
+        Box::new(tree::Function::FuncDeclaration(
+            Box::new(name),
+            Box::new(params),
+            Box::new(ret),
+            body
+        ))
+    }
+}
+
+pub Body: tree::Body = {
+    <stmt:Expr*> => tree::Body::Body(stmt)
+}
+
+Expr: tree::Expr = {
+    <expr:AssignExpr> ";" => expr,
     <expr:IfExpr> => expr,
     <expr:WhileExpr> => expr,
     <expr:ForExpr> => expr,
@@ -119,7 +153,7 @@ Stmt: tree::Expr = {
 }
 
 FuncCall: tree::Expr = {
-    <name:"identifier"> "(" <args:ArgList> ")" => {
+    <name:"identifier"> "(" <args:ArgList> ")" ";" => {
         tree::Expr::FuncCall(
             tree::Function::FuncReference(
                 Box::new(name),
@@ -182,7 +216,7 @@ AssignExpr: tree::Expr = {
      * 5. identifier++;
      * 6. identifier--;
     */
-    <spec:Specifier> <lhs:"identifier"> "=" <rhs:CompExpr> ";" => {
+    <spec:Specifier> <lhs:"identifier"> "=" <rhs:CompExpr> => {
         let mut values = Vec::new();
         values.push(spec);
         tree::Expr::Assign(
@@ -196,7 +230,7 @@ AssignExpr: tree::Expr = {
             )
         )  
     },
-    <lhs:"identifier"> "=" <rhs:CompExpr> ";" => {
+    <lhs:"identifier"> "=" <rhs:CompExpr> => {
         tree::Expr::Assign(
             tree::AssignExpr::AssignOperation(
                 Box::new(tree::Variable::VarReference(Box::new(lhs))),
@@ -204,19 +238,27 @@ AssignExpr: tree::Expr = {
             )
         )
     },
-    <lhs:"identifier"> "++" ";" => {
+    <lhs:"identifier"> "++" => {
         tree::Expr::Assign(
             tree::AssignExpr::AssignOperation(
-                Box::new(tree::Variable::VarReference(Box::new(lhs))),
-                Box::new(tree::CompExpr::Value(tree::Value::Integer(1)))
+                Box::new(tree::Variable::VarReference(Box::new(lhs.clone()))),
+                Box::new(tree::CompExpr::BinaryOperation(
+                    Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(lhs.clone())))),
+                    tree::BinaryOperator::Add,
+                    Box::new(tree::CompExpr::Value(tree::Value::Integer(1)))
+                ))
             )
         )
     },
-    <lhs:"identifier"> "--" ";" => {
+    <lhs:"identifier"> "--" => {
         tree::Expr::Assign(
             tree::AssignExpr::AssignOperation(
-                Box::new(tree::Variable::VarReference(Box::new(lhs))),
-                Box::new(tree::CompExpr::Value(tree::Value::Integer(-1)))
+                Box::new(tree::Variable::VarReference(Box::new(lhs.clone()))),
+                Box::new(tree::CompExpr::BinaryOperation(
+                    Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(lhs.clone())))),
+                    tree::BinaryOperator::Sub,
+                    Box::new(tree::CompExpr::Value(tree::Value::Integer(1)))
+                ))
             )
         )
     },
@@ -231,10 +273,18 @@ VarDec: tree::Expr = {
                 Box::new(Vec::new())
             )
         )
-    }
+    },
+    // TODO: the initialization is wrong!!!
+    "struct" <spec: "identifier"> <ident: "identifier"> ";" => {
+        tree::Expr::VarDec(
+            tree::Variable::VarDeclaration(
+                Box::new(ident),
+                Box::new(vec![tree::Value::String(spec)]),
+                Box::new(Vec::new())
+            )
+        )
+    },
 }
-
-
 
 ParaDec: tree::Variable = {
     <spec:Specifier> <name:"identifier"> => {
@@ -302,6 +352,12 @@ pub CompExpr: Box<tree::CompExpr> = {
 #[precedence(level="1")]
     Term,
 
+    <ident: "identifier"> "(" <args:ArgList> ")" => {
+      Box::new(tree::CompExpr::FuncCall(
+        tree::Function::FuncReference(Box::new(ident), Box::new(args))
+      ))
+    },
+
 #[precedence(level="2")] #[assoc(side="left")]
     <lhs:CompExpr> "^" <rhs:CompExpr> => {
       Box::new(tree::CompExpr::BinaryOperation (
@@ -343,6 +399,11 @@ pub CompExpr: Box<tree::CompExpr> = {
 }
 
 Term: Box<tree::CompExpr> = {
+#[precedence(level="1")] 
+    // TODO: The Term of referencing the member of a struct is not implemented yet.
+    <n1: "identifier"> "." <n2: "identifier"> => Box::new(tree::CompExpr::Variable(tree::Variable::MemberReference(Box::new(n1), Box::new(n2)))),
+
+#[precedence(level="2")] #[assoc(side="left")]
     <n: "identifier"> => Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(n)))),
     <n: "int"> => Box::new(tree::CompExpr::Value(tree::Value::Integer(n))),
     <n: "float"> => Box::new(tree::CompExpr::Value(tree::Value::Float(n))),

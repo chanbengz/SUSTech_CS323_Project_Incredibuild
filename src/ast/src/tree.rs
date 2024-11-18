@@ -1,10 +1,13 @@
 #[derive(Clone, Debug, PartialEq)]
-pub struct Program(pub Vec<ProgramPart>);
+pub enum Program{
+    Program(Vec<ProgramPart>),
+    Error
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProgramPart {
     Statement(Box<Statement>),
-    Function(Box<Function>)
+    Function(Box<Function>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -13,7 +16,7 @@ pub enum Statement {
     // requires special management.
     Include(Box<String>), 
     GlobalVariable(Variable),
-    Struct(Box<Vec<Variable>>)
+    Struct(Box<String>, Box<Vec<Variable>>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -21,21 +24,33 @@ pub enum Variable {
     // The last one is for the dimension list, if null than a value only.
     // (identifier, values, dimensions)
     VarReference(Box<String>),
+    MemberReference(Box<String>, Box<String>),
     VarDeclaration(Box<String>, Box<Vec<Value>>, Box<Vec<usize>>),
     FormalParameter(Box<String>, Box<Vec<Value>>, Box<Vec<usize>>),
+    Error
 }
+
+// #[derive(Clone, Debug, PartialEq)]
+// pub enum Object {
+//     StructReference(Box<String>, Box<Vec<Variable>>, Box<Vec<usize>>),
+//     StructDeclaration(Box<String>, Box<Vec<Variable>>),
+//     FormalParameter(Box<String>, Box<Vec<Variable>>, Box<Vec<usize>>),
+//     Error
+// }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Function {
     // (identifier, input_params, output_params, body)
     FuncReference(Box<String>, Box<Vec<Box<CompExpr>>>),
     FuncDeclaration(Box<String>, Box<Vec<Variable>>, Box<Value>, Body),
+    Error
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CompExpr {
     Value(Value),
     Variable(Variable),
+    FuncCall(Function),
     // Mind that UnaryOperator can only operate on 
     // Integer, Float and Bool. (Remember might need
     // to cope with array types)
@@ -50,13 +65,15 @@ pub enum AssignExpr {
     // When assigning must check whether the variable already
     // exists 
     AssignOperation(Box<Variable>, Box<CompExpr>),
+    Error
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CondExpr {
     Bool(bool),
     UnaryCondition(UnaryOperator, Box<CompExpr>),
-    Condition(Box<CompExpr>, JudgeOperator, Box<CompExpr>)
+    Condition(Box<CompExpr>, JudgeOperator, Box<CompExpr>),
+    Error
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -66,7 +83,8 @@ pub enum Value {
     String(String),
     Char(char),
     Bool(bool),
-    Null
+    Null,
+    Error
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -78,14 +96,16 @@ pub enum BinaryOperator {
     Pow, // ^
     Mod, // %
     And, // && 
-    Or   // ||
+    Or,  // ||
+    Error
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum UnaryOperator {
     Not, // !
     Inc, // ++
-    Dec  // --
+    Dec, // --
+    Error
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -95,24 +115,28 @@ pub enum JudgeOperator {
     LT, // <
     LE, // <=
     EQ, // ==
-    NE  // !=
+    NE, // !=
+    Error
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum If {
     IfExpr(Box<CondExpr>, Body),
-    IfElseExpr(Box<CondExpr>, Body, Body)
+    IfElseExpr(Box<CondExpr>, Body, Body),
+    Error
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Loop {
     WhileExpr(Box<CondExpr>, Body),
-    ForExpr(Box<Expr>, Box<CondExpr>, Box<Expr>, Body)
+    ForExpr(Box<Expr>, Box<CondExpr>, Box<Expr>, Body),
+    Error
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Body {
-    Body(Vec<Expr>)
+    Body(Vec<Expr>),
+    Error
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -124,5 +148,6 @@ pub enum Expr{
     FuncCall(Function),
     Break,
     Continue,
-    Return(CompExpr)
+    Return(CompExpr),
+    Error
 }
