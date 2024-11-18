@@ -23,10 +23,9 @@ impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Statement::Include(s) => write!(f, "Include: {}", s),
-            Statement::GlobalVariable(v) => write!(f, "Global Variable: {}", v),
-            Statement::Struct(name, vars) => write!(f, "Struct {}: [{}]", 
-                name,
+            Statement::GlobalVariable(vars) => write!(f, "GlobalVariable: [{}]", 
                 vars.iter().map(|var| format!("{}", var)).collect::<Vec<String>>().join(", ")),
+            Statement::Struct(structure) => write!(f, "Struct: {}", structure),
         }
     }
 }
@@ -44,6 +43,17 @@ impl fmt::Display for Variable {
                 values.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", "), 
                 dims.iter().map(|d| d.to_string()).collect::<Vec<String>>().join(", ")),
             Variable::VarReference(ident) => write!(f, "{}", ident),
+            Variable::VarAssignment(ident, expr) => write!(f, "Variable Assignment: {} = {}", ident, expr),
+            Variable::StructReference(ident) => write!(f, "Struct Reference: {}", ident),
+            Variable::StructDefinition(ident, vars) => write!(f, "Struct Definition: {} with [{}]", 
+                ident, 
+                vars.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", ")),
+            Variable::StructDeclaration(ident, parent, vars) => write!(f, "Struct Declaration: {} extends {} with [{}]",
+                ident, 
+                parent, 
+                vars.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", ")),
+            Variable::StructAssignment(ident, field, expr) => write!(f, "Struct Assignment: {}.{} = {}", ident, field, expr),
+
             Variable::Error => write!(f, "[VariableError]")
         }
     }
@@ -71,15 +81,6 @@ impl fmt::Display for CompExpr {
             CompExpr::BinaryOperation(left, op, right) => write!(f, "({} {} {})", left, op, right),
             CompExpr::FuncCall(func) => write!(f, "{}", func),
             CompExpr::Error => write!(f, "[CompExprError]"),
-        }
-    }
-}
-
-impl fmt::Display for AssignExpr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            AssignExpr::AssignOperation(var, expr) => write!(f, "Assignment: {} = {}", var, expr),
-            AssignExpr::Error => write!(f, "[AssignExprError]"),
         }
     }
 }
@@ -189,12 +190,12 @@ impl fmt::Display for Expr {
         match self {
             Expr::If(if_expr) => write!(f, "{}", if_expr),
             Expr::Loop(loop_expr) => write!(f, "{}", loop_expr),
-            Expr::Assign(assign_expr) => write!(f, "{}", assign_expr),
             Expr::Break => write!(f, "Break"),
             Expr::Continue => write!(f, "Continue"),
             Expr::Return(val) => write!(f, "Return: {}", val),
             Expr::FuncCall(func) => write!(f, "{}", func),
-            Expr::VarDec(var) => write!(f, "{}", var),
+            Expr::VarManagement(vars) => write!(f, "{}", 
+                vars.iter().map(|var| format!("{}", var)).collect::<Vec<String>>().join("; ")),
             Expr::Error => write!(f, "[ExprError]"),
         }
     }
