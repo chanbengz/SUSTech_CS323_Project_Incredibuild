@@ -67,7 +67,8 @@ pub enum CompExpr {
 #[derive(Clone, Debug, PartialEq)]
 pub enum CondExpr {
     Bool(bool),
-    UnaryCondition(UnaryOperator, Box<CompExpr>),
+    UnaryCondition(UnaryOperator, Box<CondExpr>),
+    BinaryCondition(Box<CondExpr>, BinaryOperator, Box<CondExpr>),
     Condition(Box<CompExpr>, JudgeOperator, Box<CompExpr>),
     Error
 }

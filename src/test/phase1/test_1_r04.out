@@ -1,0 +1,1 @@
+Functions: Function: func_1:[Body: [Return: (3: i32 * a)]], Functions: Function: func_2:[Body: [Return: (x + y)]], Functions: [FunctionError], Statement: GlobalVariable: [Variable Declaration: a = [0: i32] with dimensions [], Variable Declaration: b = [0: i32] with dimensions [], Variable Declaration: c = [0: i32] with dimensions []], Functions: [FunctionError]

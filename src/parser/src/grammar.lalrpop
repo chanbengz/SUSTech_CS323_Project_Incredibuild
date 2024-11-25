@@ -113,7 +113,8 @@ pub FuncDec: Box<tree::Function> = {
             Box::new(ret),
             body
         ))
-    }
+    },
+    ! => { errors.push(<>); Box::new(tree::Function::Error) },
 }
 
 FuncCall: tree::Expr = {
@@ -341,7 +342,15 @@ StructDec: tree::Variable = {
     }
 }
 
-CondExpr: Box<tree::CondExpr> = {
+pub CondExpr: Box<tree::CondExpr> = {
+#[precedence(level="1")]
+    "!" <expr:CondExpr> => {
+        Box::new(tree::CondExpr::UnaryCondition(
+            tree::UnaryOperator::Not, expr
+        ))
+    },
+    CondTerm,
+#[precedence(level="2")]
     <lhs:CompExpr> ">" <rhs:CompExpr> => {
         Box::new(tree::CondExpr::Condition(
             lhs, tree::JudgeOperator::GT, rhs
@@ -372,14 +381,17 @@ CondExpr: Box<tree::CondExpr> = {
             lhs, tree::JudgeOperator::NE, rhs
         ))
     },
-    "!" <expr:CompExpr> => {
-        Box::new(tree::CondExpr::UnaryCondition(
-            tree::UnaryOperator::Not, expr
+#[precedence(level="3")] #[assoc(side="left")] 
+    <lhs:CondExpr> "&&" <rhs:CondExpr> => {
+        Box::new(tree::CondExpr::BinaryCondition(
+            lhs, tree::BinaryOperator::And, rhs
         ))
     },
-    <expr:CompExpr> => {
-        Box::new(tree::CondExpr::Bool(true))
-    }
+    <lhs:CondExpr> "||" <rhs:CondExpr> => {
+        Box::new(tree::CondExpr::BinaryCondition(
+            lhs, tree::BinaryOperator::Or, rhs
+        ))
+    },
 }
 
 pub CompExpr: Box<tree::CompExpr> = {
@@ -446,10 +458,14 @@ Term: Box<tree::CompExpr> = {
     <n: "identifier"> => Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(n)))),
     <n: "int"> => Box::new(tree::CompExpr::Value(tree::Value::Integer(n))),
     <n: "float"> => Box::new(tree::CompExpr::Value(tree::Value::Float(n))),
-    <n: "bool"> => Box::new(tree::CompExpr::Value(tree::Value::Bool(n))),
     <n: "char"> => Box::new(tree::CompExpr::Value(tree::Value::Char(n))),
     "(" <CompExpr> ")",
     ! => { errors.push(<>); Box::new(tree::CompExpr::Error) },
+}
+
+CondTerm: Box<tree::CondExpr> = {
+    <n: "bool"> => Box::new(tree::CondExpr::Bool(n)),
+    "(" <CondExpr> ")",
 }
 
 extern {

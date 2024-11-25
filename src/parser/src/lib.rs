@@ -2,6 +2,7 @@ use lalrpop_util::lalrpop_mod;
 
 lalrpop_mod!(pub grammar); // synthesized by LALRPOP
 pub use grammar::CompExprParser;
+pub use grammar::CondExprParser;
 pub use grammar::ParaDecsParser;
 pub use grammar::FuncDecParser;
 pub use grammar::BodyParser;
@@ -16,11 +17,11 @@ mod tests {
 
     enum Parser {
         CompExprParser,
+        CondExprParser,
         ParaDecsParser,
         FuncDecParser,
         StmtParser,
         ProgramParser,
-        #[allow(dead_code)]
         BodyParser,
     }
 
@@ -30,6 +31,7 @@ mod tests {
 
         match parser {
             Parser::CompExprParser => assert_eq!(format!("{}", CompExprParser::new().parse(&mut errors, lexer).unwrap()), expected),
+            Parser::CondExprParser => assert_eq!(format!("{}", CondExprParser::new().parse(&mut errors, lexer).unwrap()), expected),
             Parser::ParaDecsParser => assert_eq!(format!("{}", ParaDecsParser::new().parse(&mut errors, lexer)
                     .unwrap().iter().map(|x| format!("{}", x)).collect::<Vec<String>>().join(", ")), expected), 
             Parser::FuncDecParser => assert_eq!(format!("{}", FuncDecParser::new().parse(&mut errors, lexer).unwrap()), expected),
@@ -56,6 +58,7 @@ mod tests {
 
         match parser {
             Parser::CompExprParser => assert_eq!(format!("{}", CompExprParser::new().parse(&mut errors, lexer).unwrap()), expected),
+            Parser::CondExprParser => assert_eq!(format!("{}", CondExprParser::new().parse(&mut errors, lexer).unwrap()), expected),
             Parser::ParaDecsParser => assert_eq!(format!("{}", ParaDecsParser::new().parse(&mut errors, lexer)
                     .unwrap().iter().map(|x| format!("{}", x)).collect::<Vec<String>>().join(", ")), expected), 
             Parser::FuncDecParser => assert_eq!(format!("{}", FuncDecParser::new().parse(&mut errors, lexer).unwrap()), expected),
@@ -71,6 +74,10 @@ mod tests {
         assert_parse(Parser::CompExprParser, "2 + 4 * 5", "(2: i32 + (4: i32 * 5: i32))");
         // Test expression with bracket
         assert_parse(Parser::CompExprParser, "(2 + 4) * 5", "((2: i32 + 4: i32) * 5: i32)");
+        // Test conditional expression
+        assert_parse(Parser::CondExprParser, "2 > 4", "Condition: 2: i32 > 4: i32"); 
+        // Test conbination of condexpr
+        assert_parse(Parser::CondExprParser, "true && (5 < 6 || 2 > 5)", "Condition: Condition: true && Condition: Condition: 5: i32 < 6: i32 || Condition: 2: i32 > 5: i32");
     }
 
     #[test]
@@ -158,6 +165,7 @@ mod tests {
         assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r01.spl", "../test/phase1/test_1_r01.out");
         assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r02.spl", "../test/phase1/test_1_r02.out");
         assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r03.spl", "../test/phase1/test_1_r03.out");
+        assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r04.spl", "../test/phase1/test_1_r04.out");
     }
 
     // #[test]

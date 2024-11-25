@@ -91,6 +91,7 @@ impl fmt::Display for CondExpr {
             CondExpr::Bool(b) => write!(f, "Condition: {}", b),
             CondExpr::UnaryCondition(op, expr) => write!(f, "Condition: {} {}", op, expr),
             CondExpr::Condition(left, op, right) => write!(f, "Condition: {} {} {}", left, op, right),
+            CondExpr::BinaryCondition(left, op, right) => write!(f, "Condition: {} {} {}", left, op, right),
             CondExpr::Error => write!(f, "[CondExprError]"),
         }
     }
