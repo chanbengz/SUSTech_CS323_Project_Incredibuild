@@ -519,5 +519,7 @@ extern {
     "enum" => Token::DeclarationEnum,
     "struct" => Token::DeclarationStruct,
     "include" => Token::DeclarationInclude,
+
+    "error" => Token::Error,
   }
 }

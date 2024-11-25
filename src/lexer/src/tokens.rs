@@ -15,7 +15,6 @@
 */
 
 use logos::{Logos, FilterResult};
-use core::error;
 use std::fmt; 
 use std::num::ParseIntError;
 
@@ -202,7 +201,9 @@ pub enum Token {
     #[regex(r"//[^\n]*\n?", logos::skip)]
     LineComment,
     #[token("/*", process_block_comment)]
-    BlockComment
+    BlockComment,
+
+    Error
 }
 
 fn process_string(lex: &mut logos::Lexer<Token>) -> Result<String, LexicalError> {

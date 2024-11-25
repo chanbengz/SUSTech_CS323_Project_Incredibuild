@@ -39,14 +39,20 @@ mod tests {
         }
     }
 
-    fn assert_parse_from_file(parser: Parser, file_path: &str, expected: &str){
-        let mut file_content = String::new();
-        let mut file = File::open(file_path).expect("Unable to open file");
-        file.read_to_string(&mut file_content)
+    fn assert_parse_from_file(parser: Parser, file_path: &str, out_path: &str){
+        let mut src_content = String::new();
+        let mut src_file = File::open(file_path).expect("Unable to open file");
+        src_file.read_to_string(&mut src_content)
             .expect("Unable to read file");
+
+        let mut out_content = String::new();
+        let mut out_file = File::open(out_path).expect("Unable to open file");
+        out_file.read_to_string(&mut out_content)
+            .expect("Unable to read file");
+        let expected = out_content.trim();
     
         let mut errors = Vec::new();
-        let lexer = spl_lexer::lexer::Lexer::new(&file_content);
+        let lexer = spl_lexer::lexer::Lexer::new(&src_content);
 
         match parser {
             Parser::CompExprParser => assert_eq!(format!("{}", CompExprParser::new().parse(&mut errors, lexer).unwrap()), expected),
@@ -71,6 +77,7 @@ mod tests {
     fn test_error_recovery() {
         assert_parse(Parser::CompExprParser, "2 + * 5", "(2: i32 + ([CompExprError] * 5: i32))");
         assert_parse(Parser::CompExprParser, "2 + * 5 *", "(2: i32 + (([CompExprError] * 5: i32) * [CompExprError]))");
+        assert_parse(Parser::CompExprParser, "2 + @", "(2: i32 + [CompExprError])");
     }
 
     #[test]
@@ -137,44 +144,20 @@ mod tests {
 
     #[test]
     fn test_0_r00() {
-        assert_parse_from_file(Parser::FuncDecParser, "../test/test_0_r00.spl", 
-        "Function: main:[Body: [Variable Declaration: a = [0: i32] with dimensions []; Variable Assignment: a = 3: i32, While Loop (Condition: true): \n do Body: [Variable Assignment: a = (a + 1: i32), If: Condition: a == 5: i32 then Body: [Break]], Return: null]]");
+        assert_parse_from_file(Parser::FuncDecParser, "../test/test_0_r00.spl","../test/test_0_r00.out");
     }
 
     #[test]
-    fn test_1_r01() {
-        assert_parse_from_file(Parser::FuncDecParser, "../test/test_1_r01.spl", 
-        "Function: test_1_r01:[Body: [Variable Assignment: c = c: char, If: Condition: a > b then Body: [Return: a] else Body: [Return: b]]]");
-    }
-
-    #[test]
-    fn test_1_r02() {
-        assert_parse_from_file(Parser::ProgramParser, "../test/test_1_r02.spl", 
-        "Statement: GlobalVariable: [Variable Declaration: global = [0: i32] with dimensions []], Statement: Struct: Struct Definition: my_struct with [Variable Declaration: code = [0: i32] with dimensions [], Variable Declaration: data = [ : char] with dimensions []], Functions: Function: test_1_r02:[Body: [Struct Declaration: my_struct extends obj with [], Struct Assignment: obj.code = global, Variable Assignment: global = (global + 1: i32)]]");
+    fn test_phase1() {
+        assert_parse_from_file(Parser::FuncDecParser, "../test/phase1/test_1_r01.spl", "../test/phase1/test_1_r01.out");
+        assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r02.spl", "../test/phase1/test_1_r02.out");
     }
 
     // #[test]
-    // fn test_1_s01() {
-    //     assert_parse_from_file(Parser::FuncDecParser, "../test/test_1_s01.spl", 
-    //     "Function: test_1_r03:[Body: [Assignment: c = c: char, If: Condition: a > b then Body: [Return: a] else Body: [Return: b]]]");
+    // fn test_phase2() {
     // }
 
     // #[test]
-    // fn test_1_s03() {
-    //     assert_parse_from_file(Parser::FuncDecParser, "../test/test_1_s03.spl", 
-    //     "Function: test_1_r03:[Body: [Assignment: c = c: char, If: Condition: a > b then Body: [Return: a] else Body: [Return: b]]]");
-    // }
-
-    // #[test]
-    // fn test_1_s07() {
-    //     assert_parse_from_file(Parser::FuncDecParser, "../test/test_1_s07.spl", 
-    //     "Function: test_1_r04:[Body: [Assignment: c = c: char, If: Condition: a > b then Body: [Return: a] else Body: [Return: b]]]");
-    // }
-
-    // #[test]
-    // fn test_1_s09() {
-    //     assert_parse_from_file(Parser::FuncDecParser, "../test/test_1_s09.spl", 
-    //     "Function: test_1_r08:[Body: [Assignment: c = c: char, If: Condition: a > b then Body: [Return: a] else Body: [Return: b]]]");
+    // fn test_phase3() {
     // }
 }
-

@@ -1,0 +1,2 @@
+Function: main:[Body: [Variable Declaration: a = [0: i32] with dimensions []; Variable Assignment: a = 3: i32, While Loop (Condition: true): 
+ do Body: [Variable Assignment: a = (a + 1: i32), If: Condition: a == 5: i32 then Body: [Break]], Return: null]]

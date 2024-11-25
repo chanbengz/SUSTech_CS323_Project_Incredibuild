@@ -1,3 +1,5 @@
 fn main() {
-    lalrpop::process_src().unwrap();
+    lalrpop::Configuration::new()
+        .log_debug()
+        .process_current_dir().unwrap();
 }
