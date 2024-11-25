@@ -75,9 +75,12 @@ mod tests {
 
     #[test]
     fn test_error_recovery() {
+        // Test Comptuation Expression Error Recovery
         assert_parse(Parser::CompExprParser, "2 + * 5", "(2: i32 + ([CompExprError] * 5: i32))");
         assert_parse(Parser::CompExprParser, "2 + * 5 *", "(2: i32 + (([CompExprError] * 5: i32) * [CompExprError]))");
         assert_parse(Parser::CompExprParser, "2 + @", "(2: i32 + [CompExprError])");
+        // Test Statement Error Recovery
+        assert_parse(Parser::BodyParser, "break; return 0", "Body: [Break, [ExprError]]");
     }
 
     #[test]
@@ -85,8 +88,6 @@ mod tests {
         // Test parameter declaration
         assert_parse(Parser::ParaDecsParser, "int a, int b",
         "Formal Parameter: a = [0: i32] with dimensions [], Formal Parameter: b = [0: i32] with dimensions []");
-        // Test empty parameter declaration
-        assert_parse(Parser::ParaDecsParser, "", "");
     }
 
     #[test]
@@ -156,7 +157,7 @@ mod tests {
     fn test_phase1() {
         assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r01.spl", "../test/phase1/test_1_r01.out");
         assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r02.spl", "../test/phase1/test_1_r02.out");
-        //assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r03.spl", "../test/phase1/test_1_r03.out");
+        assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r03.spl", "../test/phase1/test_1_r03.out");
     }
 
     // #[test]

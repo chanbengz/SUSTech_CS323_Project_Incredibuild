@@ -155,7 +155,9 @@ Expr: tree::Expr = {
     <expr:"return"> <val:CompExpr?> ";" => match val {
         None => tree::Expr::Return(tree::CompExpr::Value(tree::Value::Null)),
         Some(val) => tree::Expr::Return(*val)
-    }
+    },
+
+    ! => { errors.push(<>); tree::Expr::Error }
 }
 
 IfExpr: tree::Expr = {
