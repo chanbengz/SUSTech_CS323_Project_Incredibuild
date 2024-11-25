@@ -83,7 +83,8 @@ mod tests {
     #[test]
     fn test_paradeclaration() {
         // Test parameter declaration
-        assert_parse(Parser::ParaDecsParser, "int a, int b", "Formal Parameter: a = [0: i32] with dimensions [], Formal Parameter: b = [0: i32] with dimensions []");
+        assert_parse(Parser::ParaDecsParser, "int a, int b",
+        "Formal Parameter: a = [0: i32] with dimensions [], Formal Parameter: b = [0: i32] with dimensions []");
         // Test empty parameter declaration
         assert_parse(Parser::ParaDecsParser, "", "");
     }
@@ -97,9 +98,11 @@ mod tests {
     #[test]
     fn test_if() {
         // Test if statement
-        assert_parse(Parser::FuncDecParser, "int func(int a, int b) { if(a > b) { return a; }}", "Function: func:[Body: [If: Condition: a > b then Body: [Return: a]]]");
+        assert_parse(Parser::FuncDecParser, "int func(int a, int b) { if(a > b) { return a; }}",
+            "Function: func:[Body: [If: Condition: a > b then Body: [Return: a]]]");
         // Test if else statement
-        assert_parse(Parser::FuncDecParser, "int func(int a, int b) { if(a > b) { return a; } else { return b; }}", "Function: func:[Body: [If: Condition: a > b then Body: [Return: a] else Body: [Return: b]]]");
+        assert_parse(Parser::FuncDecParser, "int func(int a, int b) { if(a > b) { return a; } else { return b; }}",
+            "Function: func:[Body: [If: Condition: a > b then Body: [Return: a] else Body: [Return: b]]]");
     }
 
     #[test]
@@ -137,6 +140,8 @@ mod tests {
     fn test_stmt(){
         assert_parse(Parser::StmtParser, "int a;", 
         "GlobalVariable: [Variable Declaration: a = [0: i32] with dimensions []]");
+        assert_parse(Parser::StmtParser, "int a = 1, b = 2;",
+        "GlobalVariable: [Variable Declaration: a = [0: i32] with dimensions [], Variable Assignment: a = 1: i32, Variable Declaration: b = [0: i32] with dimensions [], Variable Assignment: b = 2: i32]");
         assert_parse(Parser::StmtParser, "struct obj { int a; char b; };", 
         "Struct: Struct Definition: obj with [Variable Declaration: a = [0: i32] with dimensions [], Variable Declaration: b = [ : char] with dimensions []]");
         assert_parse(Parser::StmtParser, "#include \"../hi.h\";", "Include: ../hi.h");
@@ -149,8 +154,9 @@ mod tests {
 
     #[test]
     fn test_phase1() {
-        assert_parse_from_file(Parser::FuncDecParser, "../test/phase1/test_1_r01.spl", "../test/phase1/test_1_r01.out");
+        assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r01.spl", "../test/phase1/test_1_r01.out");
         assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r02.spl", "../test/phase1/test_1_r02.out");
+        //assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r03.spl", "../test/phase1/test_1_r03.out");
     }
 
     // #[test]

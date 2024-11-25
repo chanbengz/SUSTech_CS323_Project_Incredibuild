@@ -20,6 +20,7 @@ ProgramPart: tree::ProgramPart = {
 // Some useful declarations in the beginning of the program
 pub ParaDecs = Comma<ParaDec>;
 pub ArgList = Comma<CompExpr>;
+VarDecs = Comma<VarDec>;
 
 Comma<T>: Vec<T> = {
     <mut v:(<T> ",")*> <e:T?> => match e {
@@ -299,15 +300,6 @@ VarDef: Vec<tree::Variable> = {
             }
         });
         variables
-    }
-}
-
-VarDecs: Vec<tree::Variable> = {
-    <var:VarDec> => vec![var],
-    <var:VarDec> "," <vars:VarDef> => {
-        let mut v = vec![var];
-        v.extend(vars);
-        v
     }
 }
 

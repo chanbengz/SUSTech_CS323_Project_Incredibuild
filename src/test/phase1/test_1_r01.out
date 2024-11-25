@@ -1,1 +1,1 @@
-Function: test_1_r01:[Body: [Variable Assignment: c = c: char, If: Condition: a > b then Body: [Return: a] else Body: [Return: b]]]
+Functions: Function: test_1_r01:[Body: [Variable Assignment: c = c: char, If: Condition: a > b then Body: [Return: a] else Body: [Return: b]]]
