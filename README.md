@@ -14,6 +14,53 @@ This project is still under development.
     - [ ] Lexer & Parser
     - [ ] Semantic Analyzer
     - [ ] Macro
+- [ ] LLVM IR Generation
+- [ ] Optimization
+    - [ ] SSA
+- [ ] Advanced
+    - [ ] Lifetime Analysis
+
+## File structure
+
+```
+.
+|-- Cargo.toml # Add your sub-project in the [workspace] members field.
+|-- Dockerfile
+|-- LICENSE
+|-- README.md
+|-- docs
+|   |-- cs323-project-tutorial1.pdf
+|   |-- cs323-project-tutorial2.pdf
+│   |-- cs323-project-tutorial3.pdf
+│   |-- midterm-project-check.pdf
+|   |-- syntax.txt
+|   `-- token.txt
+`-- src
+    |-- ast
+    |   |-- Cargo.toml # Define your dependencies in the sub-project
+    |   `-- src # In lib.rs please pub mod all the crates.
+    |-- lexer
+    |   |-- Cargo.toml
+    |   `-- src
+    |-- main.rs
+    |-- parser
+    |   |-- Cargo.toml # When including your mod please add relevant path
+    |   |-- build.rs # lalrpop parser generator
+    |   `-- src
+    `-- test
+        |-- phase1
+        |-- phase2
+        `-- phase3
+```
+
+## Testing
+
+You can run according test to separate sub-project by using `cargo test` in the root of each sub-project.
+
+```bash
+cd src/lexer
+cargo test
+```
 
 ## Development
 
