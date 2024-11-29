@@ -1,1 +1,2 @@
-Functions: Function: test_1_r03:[Body: [Variable Declaration: i = [0: i32] with dimensions []; Variable Assignment: i = 0: i32; Variable Declaration: j = [0: i32] with dimensions []; Variable Assignment: j = 1: i32, Variable Declaration: i = [0: f32] with dimensions []; Variable Assignment: i = $, If: Condition: i < 9: f32 then Body: [[ExprError]], Return: [CompExprError]]]
+Missing token ";"
+Unknown token

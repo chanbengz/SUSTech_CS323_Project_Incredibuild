@@ -9,6 +9,10 @@ pub use grammar::BodyParser;
 pub use grammar::StmtParser;
 pub use grammar::ProgramParser;
 
+use crate::fmt::display_error;
+
+pub mod fmt;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -63,8 +67,16 @@ mod tests {
                     .unwrap().iter().map(|x| format!("{}", x)).collect::<Vec<String>>().join(", ")), expected), 
             Parser::FuncDecParser => assert_eq!(format!("{}", FuncDecParser::new().parse(&mut errors, lexer).unwrap()), expected),
             Parser::StmtParser => assert_eq!(format!("{}", StmtParser::new().parse(&mut errors, lexer).unwrap()), expected),
-            Parser::ProgramParser => assert_eq!(format!("{}", ProgramParser::new().parse(&mut errors, lexer).unwrap()), expected),
             Parser::BodyParser => assert_eq!(format!("{}", BodyParser::new().parse(&mut errors, lexer).unwrap()), expected),
+            Parser::ProgramParser => {
+                let result = ProgramParser::new().parse(&mut errors, lexer).unwrap();
+                if errors.len() > 0 {
+                    let error_str = display_error(&errors);
+                    assert_eq!(error_str, expected)
+                } else {
+                    assert_eq!(format!("{}", result), expected)
+                }
+            }
         }
     }
 
@@ -140,6 +152,7 @@ mod tests {
         "Function: func:[Body: [FuncCall: add[a, b], Return: 0: i32]]");
         assert_parse(Parser::FuncDecParser, "int func(int a, int b) { return add(a, b); }",
         "Function: func:[Body: [Return: FuncCall: add[a, b]]]");
+        // Test nested function call
         assert_parse(Parser::FuncDecParser, "int func(int a, int b) { int k = add(add(a, b), b); return k; }",
         "Function: func:[Body: [Variable Declaration: k = [0: i32] with dimensions []; Variable Assignment: k = FuncCall: add[FuncCall: add[a, b], b], Return: k]]");    
         assert_parse(Parser::FuncDecParser, "int func(int a, int b) { add(add(a + 1, b) * 2, b); return k; }",
@@ -164,10 +177,11 @@ mod tests {
 
     #[test]
     fn test_phase1() {
-        assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r01.spl", "../test/phase1/test_1_r01.out");
-        assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r02.spl", "../test/phase1/test_1_r02.out");
-        assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r03.spl", "../test/phase1/test_1_r03.out");
-        assert_parse_from_file(Parser::ProgramParser, "../test/phase1/test_1_r04.spl", "../test/phase1/test_1_r04.out");
+        for i in 1..7 {
+            assert_parse_from_file(Parser::ProgramParser, 
+                &format!("../test/phase1/test_1_r0{}.spl", i), 
+                &format!("../test/phase1/test_1_r0{}.out", i));
+        }
     }
 
     // #[test]

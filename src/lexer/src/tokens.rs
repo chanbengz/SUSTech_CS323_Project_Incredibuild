@@ -23,6 +23,7 @@ pub enum LexicalError {
     InvalidInteger(String),
     InvalidCharacter(String),
     InvalidString(String),
+    MissingLexeme(String),
     UnexpectedEndOfProgram,
     NonAsciiCharacter,
     #[default]
@@ -268,6 +269,7 @@ impl fmt::Display for LexicalError {
             LexicalError::InvalidInteger(s) => write!(f, "{}", s),
             LexicalError::InvalidCharacter(s) => write!(f, "{}", s),
             LexicalError::InvalidString(s) => write!(f, "{}", s),
+            LexicalError::MissingLexeme(s) => write!(f, "Missing {}", s),
             LexicalError::UnexpectedEndOfProgram => write!(f, "Unexpected end of program"),
             LexicalError::UnknownToken => write!(f, "Unknown token"),
             LexicalError::NonAsciiCharacter => write!(f, "Non-ASCII character"),

@@ -111,7 +111,7 @@ pub FuncDec: Box<tree::Function> = {
         if rb == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
-                    error: LexicalError::InvalidCharacter(String::new())
+                    error: LexicalError::MissingLexeme("token \")\"".to_string())
                 },
                 dropped_tokens: Vec::new(), // or specify the dropped tokens
             };
@@ -167,7 +167,6 @@ Expr: tree::Expr = {
         None => tree::Expr::Return(tree::CompExpr::Value(tree::Value::Null)),
         Some(val) => tree::Expr::Return(*val)
     },
-
     ! => { errors.push(<>); tree::Expr::Error }
 }
 
@@ -468,6 +467,16 @@ Term: Box<tree::CompExpr> = {
       Box::new(tree::CompExpr::FuncCall(
         tree::Function::FuncReference(Box::new(ident), Box::new(args))
       ))
+    },
+    <error: "error"> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::UnknownToken
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        Box::new(tree::CompExpr::Error)
     },
     ! => { errors.push(<>); Box::new(tree::CompExpr::Error) },
 }
