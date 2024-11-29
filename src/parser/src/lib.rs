@@ -142,6 +142,8 @@ mod tests {
         "Function: func:[Body: [Return: FuncCall: add[a, b]]]");
         assert_parse(Parser::FuncDecParser, "int func(int a, int b) { int k = add(add(a, b), b); return k; }",
         "Function: func:[Body: [Variable Declaration: k = [0: i32] with dimensions []; Variable Assignment: k = FuncCall: add[FuncCall: add[a, b], b], Return: k]]");    
+        assert_parse(Parser::FuncDecParser, "int func(int a, int b) { add(add(a + 1, b) * 2, b); return k; }",
+        "Function: func:[Body: [FuncCall: add[(FuncCall: add[(a + 1: i32), b] * 2: i32), b], Return: k]]");
     }
 
     #[test]

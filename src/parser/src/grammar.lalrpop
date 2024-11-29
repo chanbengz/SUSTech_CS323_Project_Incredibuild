@@ -1,6 +1,7 @@
 use spl_lexer::tokens::{Token, LexicalError};
 use spl_ast::tree;
 use lalrpop_util::ErrorRecovery;
+use lalrpop_util::ParseError;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token, LexicalError>>);
 
@@ -19,7 +20,7 @@ ProgramPart: tree::ProgramPart = {
 
 // Some useful declarations in the beginning of the program
 pub ParaDecs = Comma<ParaDec>;
-pub ArgList = Comma<CompExpr>;
+ArgList = Comma<CompExpr>;
 VarDecs = Comma<VarDec>;
 
 Comma<T>: Vec<T> = {
@@ -106,7 +107,16 @@ FieldsDec: Vec<tree::Variable> = {
 * 3. Body: { Expr* }
 */
 pub FuncDec: Box<tree::Function> = {
-    <ret: Specifier> <name:"identifier"> "(" <params:ParaDecs> ")" "{" <body:Body> "}" => {
+    <ret: Specifier> <name:"identifier"> <lb:"("> <params:ParaDecs> <rb:")"?> "{" <body:Body> "}" => {
+        if rb == None {
+            let error = ErrorRecovery {
+                error: ParseError::User {
+                    error: LexicalError::InvalidCharacter(String::new())
+                },
+                dropped_tokens: Vec::new(), // or specify the dropped tokens
+            };
+            errors.push(error);
+        }
         Box::new(tree::Function::FuncDeclaration(
             Box::new(name),
             Box::new(params),
@@ -398,12 +408,6 @@ pub CompExpr: Box<tree::CompExpr> = {
     #[precedence(level="1")]
     Term,
 
-    <ident: "identifier"> "(" <args:ArgList> ")" => {
-      Box::new(tree::CompExpr::FuncCall(
-        tree::Function::FuncReference(Box::new(ident), Box::new(args))
-      ))
-    },
-
     #[precedence(level="2")] #[assoc(side="left")]
     <lhs:CompExpr> "^" <rhs:CompExpr> => {
       Box::new(tree::CompExpr::BinaryOperation (
@@ -455,11 +459,16 @@ Specifier: tree::Value = {
 }
 
 Term: Box<tree::CompExpr> = {
+    "(" <CompExpr> ")",
     <n: "identifier"> => Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(n)))),
     <n: "int"> => Box::new(tree::CompExpr::Value(tree::Value::Integer(n))),
     <n: "float"> => Box::new(tree::CompExpr::Value(tree::Value::Float(n))),
     <n: "char"> => Box::new(tree::CompExpr::Value(tree::Value::Char(n))),
-    "(" <CompExpr> ")",
+    <ident: "identifier"> "(" <args:ArgList> ")" => {
+      Box::new(tree::CompExpr::FuncCall(
+        tree::Function::FuncReference(Box::new(ident), Box::new(args))
+      ))
+    },
     ! => { errors.push(<>); Box::new(tree::CompExpr::Error) },
 }
 
