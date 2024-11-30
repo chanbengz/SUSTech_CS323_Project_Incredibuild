@@ -9,7 +9,7 @@ pub use grammar::BodyParser;
 pub use grammar::StmtParser;
 pub use grammar::ProgramParser;
 
-use crate::fmt::display_error;
+pub use crate::fmt::display_error;
 
 pub mod fmt;
 
@@ -168,6 +168,7 @@ mod tests {
         assert_parse(Parser::StmtParser, "struct obj { int a; char b; };", 
         "Struct: Struct Definition: obj with [Variable Declaration: a = [0: i32] with dimensions [], Variable Declaration: b = [ : char] with dimensions []]");
         assert_parse(Parser::StmtParser, "#include \"../hi.h\";", "Include: ../hi.h");
+        assert_parse(Parser::StmtParser, "int a[1];", "GlobalVariable: [Variable Declaration: a = [0: i32] with dimensions [1: i32]]");
     }
 
     #[test]
@@ -177,11 +178,16 @@ mod tests {
 
     #[test]
     fn test_phase1() {
-        for i in 1..7 {
+        for i in 1..10 {
             assert_parse_from_file(Parser::ProgramParser, 
-                &format!("../test/phase1/test_1_r0{}.spl", i), 
-                &format!("../test/phase1/test_1_r0{}.out", i));
+                &format!("../test/phase1/test_1_r{:0>2}.spl", i), 
+                &format!("../test/phase1/test_1_r{:0>2}.out", i));
         }
+        //for i in 1..6 {
+        //    assert_parse_from_file(Parser::ProgramParser, 
+        //        &format!("../test/phase1/test_1_s{}.spl", i), 
+        //        &format!("../test/phase1/test_1_s{}.out", i));
+        //}
     }
 
     // #[test]

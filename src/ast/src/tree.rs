@@ -25,9 +25,9 @@ pub enum Variable {
     // (identifier, values, dimensions)
     // Variable can be used to declare a variable or reference a variable.
     // Variable can be a single value or an array.
-    VarReference(Box<String>),
-    VarDeclaration(Box<String>, Box<Vec<Value>>, Box<Vec<usize>>),
-    VarAssignment(Box<String>, Box<CompExpr>),
+    VarReference(Box<String>, Box<Vec<CompExpr>>),
+    VarDeclaration(Box<String>, Box<Vec<Value>>, Box<Vec<CompExpr>>),
+    VarAssignment(Box<String>, Box<CompExpr>, Box<Vec<CompExpr>>),
 
     // Struct is defined to realize object.
     StructReference(Box<String>),

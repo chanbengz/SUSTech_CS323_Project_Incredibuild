@@ -45,15 +45,15 @@ ParaDec: tree::Variable = {
     }
 }
 
-DimDecs: Vec<usize> = {
-    "[" <n:"int"> "]" => {
+DimDecs: Vec<tree::CompExpr> = {
+    "[" <n:CompExpr> "]" => {
         let mut v = Vec::new();
-        v.push(n as usize);
+        v.push(*n);
         v
     },
-    "[" <n:"int"> "]" <size:DimDecs> => {
+    "[" <n:CompExpr> "]" <size:DimDecs> => {
         let mut v = Vec::new();
-        v.push(n as usize);
+        v.push(*n);
         v.extend(size);
         v
     }
@@ -92,7 +92,18 @@ pub Stmt: tree::Statement = {
 * Fields declaration: Used in struct definition 
 */
 FieldsDec: Vec<tree::Variable> = {
-    <field:VarDef> ";" => field,
+    <field:VarDef> <comma:";"?> => {
+        if comma == None {
+            let error = ErrorRecovery {
+                error: ParseError::User {
+                    error: LexicalError::MissingLexeme("token \";\"".to_string())
+                },
+                dropped_tokens: Vec::new(), // or specify the dropped tokens
+            };
+            errors.push(error);
+        }
+        field
+    },
     <field:VarDef> ";" <fields:FieldsDec> => {
         let mut v = field.clone();
         v.extend(fields);
@@ -242,27 +253,37 @@ VarManagement: tree::Expr = {
             )]
         )
     },
-    <lhs:"identifier"> "++" => {
+    <lhs:"identifier"> <dims:DimDecs?> "++" => {
+        let dims = match dims {
+            Some(dims) => dims,
+            None => Vec::new()
+        };
         tree::Expr::VarManagement(
             vec![tree::Variable::VarAssignment(
                 Box::new(lhs.clone()),
                 Box::new(tree::CompExpr::BinaryOperation(
-                    Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(lhs.clone())))),
+                    Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(lhs.clone()), Box::new(dims)))),
                     tree::BinaryOperator::Add,
                     Box::new(tree::CompExpr::Value(tree::Value::Integer(1)))
-                ))
+                )),
+                Box::new(Vec::new())
             )]
         )
     },
-    <lhs:"identifier"> "--" => {
+    <lhs:"identifier"> <dims:DimDecs?> "--" => {
+        let dims = match dims {
+            Some(dims) => dims,
+            None => Vec::new()
+        };
         tree::Expr::VarManagement(
             vec![tree::Variable::VarAssignment(
                 Box::new(lhs.clone()),
                 Box::new(tree::CompExpr::BinaryOperation(
-                    Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(lhs.clone())))),
+                    Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(lhs.clone()), Box::new(dims)))),
                     tree::BinaryOperator::Sub,
                     Box::new(tree::CompExpr::Value(tree::Value::Integer(1)))
-                ))
+                )),
+                Box::new(Vec::new())
             )]
         )
     },
@@ -290,23 +311,23 @@ VarDef: Vec<tree::Variable> = {
         let mut variables = Vec::new();
         var.iter().for_each(|x| {
             match x {
-                tree::Variable::VarReference(name) => {
-                    let mut values = Vec::new();
-                    values.push(spec.clone());
-                    variables.push(tree::Variable::VarDeclaration(name.clone(), Box::new(values), Box::new(Vec::new())));
-                },
                 tree::Variable::VarDeclaration(name, values, size) => {
                     let mut values = Vec::new();
                     let mut scale = 1;
-                    size.iter().for_each(|x| scale *= x);
+                    size.iter().for_each(|x| {
+                        match x {
+                            tree::CompExpr::Value(tree::Value::Integer(x)) => scale *= x,
+                            _ => () // add error handling here?
+                        }
+                    });
                     for _ in 0..scale {
                         values.push(spec.clone());
                     }
                     variables.push(tree::Variable::VarDeclaration(name.clone(), Box::new(values), size.clone()));
                 },
-                tree::Variable::VarAssignment(name, value) => {
+                tree::Variable::VarAssignment(name, value, dims) => {
                     variables.push(tree::Variable::VarDeclaration(name.clone(), Box::new(vec![spec.clone()]), Box::new(Vec::new())));
-                    variables.push(tree::Variable::VarAssignment(name.clone(), value.clone()));
+                    variables.push(tree::Variable::VarAssignment(name.clone(), value.clone(), dims.clone()));
                 },
                 _ => panic!("Invalid variable declaration")
             }
@@ -319,23 +340,28 @@ VarDef: Vec<tree::Variable> = {
 // 1. identifier; => specifier ident;
 // 2. identifier[size][size]...; => specifier ident[size][size]...;
 // 3. identifier = CompExpr; => specifier ident = CompExpr;
+// TODO: 4. identifier[size] = {values..}
 VarDec: tree::Variable = {
-    <ident: "identifier"> => {
-        tree::Variable::VarReference(
-            Box::new(ident)
-        )
-    },
-    <ident: "identifier"> <size: DimDecs> => {
+    <ident: "identifier"> <size: DimDecs?> => {
+        let dims = match size {
+            Some(dims) => dims,
+            None => Vec::new()
+        };
         tree::Variable::VarDeclaration(
             Box::new(ident),
             Box::new(Vec::new()),
-            Box::new(size)
+            Box::new(dims)
         )
     },
-    <ident: "identifier"> "=" <val:CompExpr> => {
+    <ident: "identifier"> <size: DimDecs?> "=" <val:CompExpr> => {
+        let dims = match size {
+            Some(dims) => dims,
+            None => Vec::new()
+        };
         tree::Variable::VarAssignment(
             Box::new(ident),
-            val
+            val,
+            Box::new(dims)
         )
     },
 }
@@ -346,7 +372,8 @@ StructDec: tree::Variable = {
     "." <ident: "identifier"> ":" <val: CompExpr> => {
         tree::Variable::VarAssignment(
             Box::new(ident),
-            val
+            val,
+            Box::new(Vec::new())
         )
     }
 }
@@ -409,43 +436,42 @@ pub CompExpr: Box<tree::CompExpr> = {
 
     #[precedence(level="2")] #[assoc(side="left")]
     <lhs:CompExpr> "^" <rhs:CompExpr> => {
-      Box::new(tree::CompExpr::BinaryOperation (
-        lhs, tree::BinaryOperator::Pow, rhs
-      ))
+        Box::new(tree::CompExpr::BinaryOperation (
+            lhs, tree::BinaryOperator::Pow, rhs
+        ))
     },
 
     <lhs:CompExpr> "%" <rhs:CompExpr> => {
-      Box::new(tree::CompExpr::BinaryOperation (
-        lhs, tree::BinaryOperator::Mod, rhs
-      ))
+        Box::new(tree::CompExpr::BinaryOperation (
+            lhs, tree::BinaryOperator::Mod, rhs
+        ))
     },
 
     #[precedence(level="3")] #[assoc(side="left")]
     <lhs:CompExpr> "*" <rhs:CompExpr> => {
-      Box::new(tree::CompExpr::BinaryOperation (
-        lhs, tree::BinaryOperator::Mul, rhs
-      ))
+        Box::new(tree::CompExpr::BinaryOperation (
+            lhs, tree::BinaryOperator::Mul, rhs
+        ))
     },
 
     <lhs:CompExpr> "/" <rhs:CompExpr> => {
-      Box::new(tree::CompExpr::BinaryOperation (
-        lhs, tree::BinaryOperator::Div, rhs
-      ))
+        Box::new(tree::CompExpr::BinaryOperation (
+            lhs, tree::BinaryOperator::Div, rhs
+        ))
     },
 
     #[precedence(level="4")] #[assoc(side="left")]
     <lhs:CompExpr> "+" <rhs:CompExpr> => {
-      Box::new(tree::CompExpr::BinaryOperation (
-        lhs, tree::BinaryOperator::Add, rhs
-      ))
+        Box::new(tree::CompExpr::BinaryOperation (
+            lhs, tree::BinaryOperator::Add, rhs
+        ))
     },
 
     <lhs:CompExpr> "-" <rhs:CompExpr> => {
-      Box::new(tree::CompExpr::BinaryOperation (
-        lhs, tree::BinaryOperator::Sub, rhs
-      ))
+        Box::new(tree::CompExpr::BinaryOperation (
+            lhs, tree::BinaryOperator::Sub, rhs
+        ))
     },
-    
 }
 
 Specifier: tree::Value = {
@@ -459,14 +485,19 @@ Specifier: tree::Value = {
 
 Term: Box<tree::CompExpr> = {
     "(" <CompExpr> ")",
-    <n: "identifier"> => Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(n)))),
+    <n: "identifier"> <dims:DimDecs?> => {
+        match dims {
+            Some(dims) => Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(n), Box::new(dims)))),
+            None => Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(n), Box::new(Vec::new())))),
+        }
+    },
     <n: "int"> => Box::new(tree::CompExpr::Value(tree::Value::Integer(n))),
     <n: "float"> => Box::new(tree::CompExpr::Value(tree::Value::Float(n))),
     <n: "char"> => Box::new(tree::CompExpr::Value(tree::Value::Char(n))),
     <ident: "identifier"> "(" <args:ArgList> ")" => {
-      Box::new(tree::CompExpr::FuncCall(
-        tree::Function::FuncReference(Box::new(ident), Box::new(args))
-      ))
+        Box::new(tree::CompExpr::FuncCall(
+            tree::Function::FuncReference(Box::new(ident), Box::new(args))
+        ))
     },
     <error: "error"> => {
         let error = ErrorRecovery {
@@ -487,67 +518,67 @@ CondTerm: Box<tree::CondExpr> = {
 }
 
 extern {
-  type Location = usize;
-  type Error = LexicalError;
+    type Location = usize;
+    type Error = LexicalError;
 
-  enum Token {
-    "identifier" => Token::Identifier(<String>),
+    enum Token {
+        "identifier" => Token::Identifier(<String>),
     
-    "int" => Token::LiteralInt(<i32>),
-    "float" => Token::LiteralFloat(<f32>),
-    "bool" => Token::LiteralBool(<bool>),
-    "char" => Token::LiteralChar(<char>),
-    "string" => Token::LiteralString(<String>),
-    "typeint" => Token::TypeInt,
-    "typefloat" => Token::TypeFloat,
-    "typebool" => Token::TypeBool,
-    "typechar" => Token::TypeChar,
-    "typestr" => Token::TypeString,
-    "void" => Token::TypeVoid,
-    "null" => Token::TypeNull,
+        "int" => Token::LiteralInt(<i32>),
+        "float" => Token::LiteralFloat(<f32>),
+        "bool" => Token::LiteralBool(<bool>),
+        "char" => Token::LiteralChar(<char>),
+        "string" => Token::LiteralString(<String>),
+        "typeint" => Token::TypeInt,
+        "typefloat" => Token::TypeFloat,
+        "typebool" => Token::TypeBool,
+        "typechar" => Token::TypeChar,
+        "typestr" => Token::TypeString,
+        "void" => Token::TypeVoid,
+        "null" => Token::TypeNull,
 
-    "(" => Token::LeftParen,
-    ")" => Token::RightParen,
-    "{" => Token::LeftBrace,
-    "}" => Token::RightBrace,
-    "[" => Token::LeftBracket,
-    "]" => Token::RightBracket,
-    "." => Token::Dot,
-    "," => Token::Comma,
-    ";" => Token::Semicolon,
-    ":" => Token::Colon,
+        "(" => Token::LeftParen,
+        ")" => Token::RightParen,
+        "{" => Token::LeftBrace,
+        "}" => Token::RightBrace,
+        "[" => Token::LeftBracket,
+        "]" => Token::RightBracket,
+        "." => Token::Dot,
+        "," => Token::Comma,
+        ";" => Token::Semicolon,
+        ":" => Token::Colon,
 
-    "+" => Token::OpPlus,
-    "-" => Token::OpMinus,
-    "*" => Token::OpMul,
-    "/" => Token::OpDiv,
-    "^" => Token::OpPow,
-    "%" => Token::OpMod,
-    ">" => Token::OpGreaterThan,
-    "<" => Token::OpLessThan,
-    ">=" => Token::OpGreaterThanEqual,
-    "<=" => Token::OpLessThanEqual,
-    "==" => Token::OpEqual,
-    "!=" => Token::OpNotEqual,
-    "&&" => Token::OpAnd,
-    "||" => Token::OpOr,
-    "!" => Token::OpNot,
-    "=" => Token::OpAssign,
-    "++" => Token::OpIncrement,
-    "--" => Token::OpDecrement,
+        "+" => Token::OpPlus,
+        "-" => Token::OpMinus,
+        "*" => Token::OpMul,
+        "/" => Token::OpDiv,
+        "^" => Token::OpPow,
+        "%" => Token::OpMod,
+        ">" => Token::OpGreaterThan,
+        "<" => Token::OpLessThan,
+        ">=" => Token::OpGreaterThanEqual,
+        "<=" => Token::OpLessThanEqual,
+        "==" => Token::OpEqual,
+        "!=" => Token::OpNotEqual,
+        "&&" => Token::OpAnd,
+        "||" => Token::OpOr,
+        "!" => Token::OpNot,
+        "=" => Token::OpAssign,
+        "++" => Token::OpIncrement,
+        "--" => Token::OpDecrement,
 
-    "if" => Token::KeywordIf,
-    "else" => Token::KeywordElse,
-    "while" => Token::KeywordWhile,
-    "for" => Token::KeywordFor,
-    "return" => Token::KeywordReturn,
-    "break" => Token::KeywordBreak,
-    "continue" => Token::KeywordContinue,
+        "if" => Token::KeywordIf,
+        "else" => Token::KeywordElse,
+        "while" => Token::KeywordWhile,
+        "for" => Token::KeywordFor,
+        "return" => Token::KeywordReturn,
+        "break" => Token::KeywordBreak,
+        "continue" => Token::KeywordContinue,
 
-    "enum" => Token::DeclarationEnum,
-    "struct" => Token::DeclarationStruct,
-    "include" => Token::DeclarationInclude,
+        "enum" => Token::DeclarationEnum,
+        "struct" => Token::DeclarationStruct,
+        "include" => Token::DeclarationInclude,
 
-    "error" => Token::Error,
-  }
+        "error" => Token::Error,
+    }
 }
