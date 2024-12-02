@@ -1,4 +1,2 @@
-Missing token ";"
-Missing token ";"
-Missing token "("
-Missing token "("
+Error type A at Line 7: unknown lexeme |
+Error type A at Line 8: unknown lexeme &

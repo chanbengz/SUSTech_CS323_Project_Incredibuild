@@ -1,4 +1,5 @@
 use lalrpop_util::lalrpop_mod;
+use core::result::Result::Err;
 
 lalrpop_mod!(pub grammar); // synthesized by LALRPOP
 pub use grammar::CompExprParser;
@@ -19,7 +20,7 @@ pub fn parse(source: &str) -> Result<tree::Program, Err(String)> {
     let result = ProgramParser::new().parse(&mut errors, lexer).unwrap();
     if errors.len() > 0 {
         display_error(&errors);
-        Err("Error in parsing")
+        Err("Error in parsing".to_string())
     } else {
         Ok(result)
     }

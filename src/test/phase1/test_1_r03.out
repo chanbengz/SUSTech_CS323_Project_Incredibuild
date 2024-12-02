@@ -1,2 +1,3 @@
-Missing token ";"
-Unknown token
+Error type A at Line 4: unknown lexeme $
+Error type B at Line 6: Missing semicolon ';'
+Error type A at Line 8: unknown lexeme @
