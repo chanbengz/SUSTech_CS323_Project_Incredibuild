@@ -19,7 +19,7 @@ pub fn parse(source: &str) -> Result<tree::Program, String> {
     let result = ProgramParser::new().parse(&mut errors, lexer).unwrap();
     if errors.len() > 0 {
         display_error(&errors, &source);
-        Err("Error in parsing".to_string())
+        Err(format!("Syntax Error: {}", errors.len()))
     } else {
         Ok(result)
     }

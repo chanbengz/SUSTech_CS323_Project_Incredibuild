@@ -23,9 +23,11 @@ pub enum LexicalError {
     InvalidInteger(String),
     InvalidCharacter(String),
     InvalidString(String),
-    MissingLexeme(String, usize),
     UnexpectedEndOfProgram,
     NonAsciiCharacter,
+    // error for parser
+    MissingLexeme(usize, String, usize),
+    UnknownLexeme(usize, usize),
     #[default]
     UnknownToken
 }
@@ -196,6 +198,7 @@ pub enum Token {
     #[token("/*", process_block_comment)]
     BlockComment,
 
+    // error handling
     Error
 }
 
@@ -267,7 +270,8 @@ impl fmt::Display for LexicalError {
             LexicalError::InvalidInteger(s) => write!(f, "{}", s),
             LexicalError::InvalidCharacter(s) => write!(f, "{}", s),
             LexicalError::InvalidString(s) => write!(f, "{}", s),
-            LexicalError::MissingLexeme(s, end) => write!(f, "Missing {} at {}", s, end),
+            LexicalError::MissingLexeme(start, token, _end) => write!(f, "Missing {} at {}", token, start),
+            LexicalError::UnknownLexeme(start, _end) => write!(f, "Unknown lexeme at {}", start),
             LexicalError::UnexpectedEndOfProgram => write!(f, "Unexpected end of program"),
             LexicalError::UnknownToken => write!(f, "Unknown token"),
             LexicalError::NonAsciiCharacter => write!(f, "Non-ASCII character"),

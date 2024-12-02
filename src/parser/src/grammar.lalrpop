@@ -92,11 +92,11 @@ pub Stmt: tree::Statement = {
 * Fields declaration: Used in struct definition 
 */
 FieldsDec: Vec<tree::Variable> = {
-    <field:VarDef> <l:@L> <comma:";"?> => {
+    <field:VarDef> <l:@L> <comma:";"?> <r:@R> => {
         if comma == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
-                    error: LexicalError::MissingLexeme("token \";\"".to_string(), l)
+                    error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
                 },
                 dropped_tokens: Vec::new(), // or specify the dropped tokens
             };
@@ -117,11 +117,11 @@ FieldsDec: Vec<tree::Variable> = {
 * 3. Body: { Expr* }
 */
 pub FuncDec: Box<tree::Function> = {
-    <ret: Specifier> <name:"identifier"> <lb:"("> <params:ParaDecs> <l:@L><rb:")"?> "{" <body:Body> "}" => {
+    <ret: Specifier> <name:"identifier"> <lb:"("> <params:ParaDecs> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> "}" => {
         if rb == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
-                    error: LexicalError::MissingLexeme("token \")\"".to_string(), l)
+                    error: LexicalError::MissingLexeme(l, "closing parenthesis ')'".to_string(), r)
                 },
                 dropped_tokens: Vec::new(), // or specify the dropped tokens
             };
@@ -328,7 +328,7 @@ VarDef: Vec<tree::Variable> = {
                     variables.push(tree::Variable::VarDeclaration(name.clone(), Box::new(vec![spec.clone()]), Box::new(Vec::new())));
                     variables.push(tree::Variable::VarAssignment(name.clone(), value.clone(), dims.clone()));
                 },
-                _ => panic!("Invalid variable declaration")
+                _ => {}
             }
         });
         variables
@@ -503,10 +503,12 @@ Term: Box<tree::CompExpr> = {
             tree::Function::FuncReference(Box::new(ident), Box::new(args))
         ))
     },
-    <error: "error"> => {
+
+    // error recovery
+    <l:@L> <error: "error"> <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
-                error: LexicalError::UnknownToken
+                error: LexicalError::UnknownLexeme(l, r)
             },
             dropped_tokens: Vec::new(),
         };
