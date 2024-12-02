@@ -1,0 +1,1 @@
+Functions: Function: test_1_o02:[Body: [Variable Declaration: dec_int = [0: i32] with dimensions []; Variable Assignment: dec_int = 323: i32, Variable Declaration: hex_int = [0: i32] with dimensions []; Variable Assignment: hex_int = 4095: i32, Variable Declaration: ch = [ : char] with dimensions []; Variable Assignment: ch = l: char, Return: (hex_int - dec_int)]]

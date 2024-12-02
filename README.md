@@ -6,7 +6,8 @@ C-like Compiler in Rust
 
 </div>
 
-This project is still under development.
+> [!WARNING]
+> This project is still on the fly.
 
 ## Features
 
