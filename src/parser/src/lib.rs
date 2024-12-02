@@ -8,10 +8,22 @@ pub use grammar::FuncDecParser;
 pub use grammar::BodyParser;
 pub use grammar::StmtParser;
 pub use grammar::ProgramParser;
+use spl_ast::tree;
+pub use crate::error::display_error;
 
-pub use crate::fmt::display_error;
+pub mod error;
 
-pub mod fmt;
+pub fn parse(source: &str) -> Result<tree::Program, Err(String)> {
+    let mut errors = Vec::new();
+    let lexer = spl_lexer::lexer::Lexer::new(&source);
+    let result = ProgramParser::new().parse(&mut errors, lexer).unwrap();
+    if errors.len() > 0 {
+        display_error(&errors);
+        Err("Error in parsing")
+    } else {
+        Ok(result)
+    }
+}
 
 #[cfg(test)]
 mod tests {

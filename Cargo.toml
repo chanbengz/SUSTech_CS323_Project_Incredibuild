@@ -8,7 +8,7 @@ members = [ "src/ast",
     "src/lexer",
     "src/parser",
     "src/ast"
-]
+, "src/analyser"]
 
 [dependencies]
 logos = "0.14.2"
