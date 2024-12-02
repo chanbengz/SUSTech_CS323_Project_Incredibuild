@@ -23,7 +23,7 @@ pub enum LexicalError {
     InvalidInteger(String),
     InvalidCharacter(String),
     InvalidString(String),
-    MissingLexeme(String),
+    MissingLexeme(String, usize),
     UnexpectedEndOfProgram,
     NonAsciiCharacter,
     #[default]
@@ -156,19 +156,11 @@ pub enum Token {
     // Literals
     #[regex("true|false", |lex| lex.slice() == "true")]
     LiteralBool(bool),
-    #[regex(r"-?(?:0|[1-9]\d*)?\.\d+(?:[eE][+-]?\d+)?", |lex| lex.slice().parse::<f32>().unwrap(), priority = 10)]
+    #[regex(r"(?:0|[1-9]\d*)?\.\d+(?:[eE][+-]?\d+)?", |lex| lex.slice().parse::<f32>().unwrap(), priority = 10)]
     LiteralFloat(f32),
-    #[regex(r"-?[0-9]+", |lex| lex.slice().parse::<i32>().unwrap())]
-    #[regex(r"-?0[xX][0-9a-fA-F]+", |lex| {
-        if lex.slice().chars().nth(0) == Some('-') {
-            let hex = &lex.slice()[3..]; // Extract the hex part after -0x
-            -i32::from_str_radix(hex, 16).unwrap()
-        } else {
-            let hex = &lex.slice()[2..]; // Extract the hex part after 0x
-            i32::from_str_radix(hex, 16).unwrap()
-        }
-    })]
-    LiteralInt(i32),
+    #[regex(r"(0|[1-9][0-9]*)", |lex| lex.slice().parse::<u32>().unwrap())]
+    #[regex(r"0[xX][0-9a-fA-F]+", process_hex)]
+    LiteralInt(u32),
     #[regex(r"'.'", |lex| {
         let slice = lex.slice();
         let c = slice.chars().nth(1).unwrap();
@@ -178,7 +170,7 @@ pub enum Token {
             Err(LexicalError::NonAsciiCharacter)
         }
     })]
-    #[regex(r"'\\u[0-9a-fA-F]{1,6}'", |lex| {
+    #[regex(r"'\\[xu][0-9a-fA-F]{1,6}'", |lex| {
         let slice = lex.slice();
         let hex_part = &slice[3..slice.len() - 1]; // Extract the hex part after \u
         match u32::from_str_radix(hex_part, 16) {
@@ -196,7 +188,7 @@ pub enum Token {
     LiteralString(String),
 
     // Identifier
-    #[regex(r"[a-zA-Z_$][a-zA-Z0-9_$]*", |lex| lex.slice().to_owned())]
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_owned())]
     Identifier(String),
 
     #[regex(r"//[^\n]*\n?", logos::skip)]
@@ -205,6 +197,12 @@ pub enum Token {
     BlockComment,
 
     Error
+}
+
+fn process_hex(lex: &mut logos::Lexer<Token>) -> Result<u32, LexicalError> {
+    let slice = lex.slice();
+    let hex = &slice[2..];
+    u32::from_str_radix(hex, 16).map_err(|_| LexicalError::InvalidInteger(format!("Invalid hexadecimal number: {}", hex)))
 }
 
 fn process_string(lex: &mut logos::Lexer<Token>) -> Result<String, LexicalError> {
@@ -269,7 +267,7 @@ impl fmt::Display for LexicalError {
             LexicalError::InvalidInteger(s) => write!(f, "{}", s),
             LexicalError::InvalidCharacter(s) => write!(f, "{}", s),
             LexicalError::InvalidString(s) => write!(f, "{}", s),
-            LexicalError::MissingLexeme(s) => write!(f, "Missing {}", s),
+            LexicalError::MissingLexeme(s, end) => write!(f, "Missing {} at {}", s, end),
             LexicalError::UnexpectedEndOfProgram => write!(f, "Unexpected end of program"),
             LexicalError::UnknownToken => write!(f, "Unknown token"),
             LexicalError::NonAsciiCharacter => write!(f, "Non-ASCII character"),

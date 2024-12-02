@@ -75,7 +75,7 @@ pub enum CondExpr {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
-    Integer(i32),
+    Integer(u32),
     Float(f32),
     String(String),
     Char(char),

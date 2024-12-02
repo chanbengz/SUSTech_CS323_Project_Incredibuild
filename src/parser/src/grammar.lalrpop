@@ -92,11 +92,11 @@ pub Stmt: tree::Statement = {
 * Fields declaration: Used in struct definition 
 */
 FieldsDec: Vec<tree::Variable> = {
-    <field:VarDef> <comma:";"?> => {
+    <field:VarDef> <l:@L> <comma:";"?> => {
         if comma == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
-                    error: LexicalError::MissingLexeme("token \";\"".to_string())
+                    error: LexicalError::MissingLexeme("token \";\"".to_string(), l)
                 },
                 dropped_tokens: Vec::new(), // or specify the dropped tokens
             };
@@ -117,11 +117,11 @@ FieldsDec: Vec<tree::Variable> = {
 * 3. Body: { Expr* }
 */
 pub FuncDec: Box<tree::Function> = {
-    <ret: Specifier> <name:"identifier"> <lb:"("> <params:ParaDecs> <rb:")"?> "{" <body:Body> "}" => {
+    <ret: Specifier> <name:"identifier"> <lb:"("> <params:ParaDecs> <l:@L><rb:")"?> "{" <body:Body> "}" => {
         if rb == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
-                    error: LexicalError::MissingLexeme("token \")\"".to_string())
+                    error: LexicalError::MissingLexeme("token \")\"".to_string(), l)
                 },
                 dropped_tokens: Vec::new(), // or specify the dropped tokens
             };
@@ -528,7 +528,7 @@ extern {
     enum Token {
         "identifier" => Token::Identifier(<String>),
     
-        "int" => Token::LiteralInt(<i32>),
+        "int" => Token::LiteralInt(<u32>),
         "float" => Token::LiteralFloat(<f32>),
         "bool" => Token::LiteralBool(<bool>),
         "char" => Token::LiteralChar(<char>),

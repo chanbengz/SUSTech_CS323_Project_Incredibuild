@@ -91,20 +91,15 @@ mod test {
     fn identifiers() {
         assert_lex(
             "
-                foo _foo $foo $_foo _ $ $$ fooBar BarFoo foo10 $1
+                foo _foo _ fooBar BarFoo foo10
             ",
              &[
                 (Identifier(String::from("foo")), "foo"),
                 (Identifier(String::from("_foo")), "_foo"),
-                (Identifier(String::from("$foo")), "$foo"),
-                (Identifier(String::from("$_foo")), "$_foo"),
                 (Identifier(String::from("_")), "_"),
-                (Identifier(String::from("$")), "$"),
-                (Identifier(String::from("$$")), "$$"),
                 (Identifier(String::from("fooBar")), "fooBar"),
                 (Identifier(String::from("BarFoo")), "BarFoo"),
                 (Identifier(String::from("foo10")), "foo10"),
-                (Identifier(String::from("$1")), "$1"),
             ][..]
         );
     }

@@ -102,7 +102,7 @@ impl fmt::Display for CondExpr {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Integer(i) => write!(f, "{}: i32", i),
+            Value::Integer(i) => write!(f, "{}: u32", i),
             Value::Float(fl) => write!(f, "{}: f32", fl),
             Value::String(s) => write!(f, "{}: String", s),
             Value::Char(c) => write!(f, "{}: char", c),
@@ -169,7 +169,7 @@ impl fmt::Display for If {
 impl fmt::Display for Loop {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Loop::WhileExpr(cond, body) => write!(f, "While Loop ({}): \n do {}", cond, body),
+            Loop::WhileExpr(cond, body) => write!(f, "While Loop ({}):\ndo {}", cond, body),
             Loop::ForExpr(init, cond, update, body) => write!(f, "For Loop ([Initial] {}; [Condition] {}; [Increment] {}): \n do {}", init, cond, update, body),
             Loop::Error => write!(f, "[LoopError]"),
         }

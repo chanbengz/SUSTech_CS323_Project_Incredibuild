@@ -1,2 +1,2 @@
-Functions: Function: test_1_r05:[Body: [Variable Declaration: res = [0: i32] with dimensions []; Variable Assignment: res = 1: i32, While Loop (Condition: n > 0: i32): 
- do Body: [Variable Assignment: res = (res * n), Variable Assignment: n = (n - 1: i32)], Return: res]]
+Functions: Function: test_1_r05:[Body: [Variable Declaration: res = [0: u32] with dimensions []; Variable Assignment: res = 1: u32, While Loop (Condition: n > 0: u32):
+ do Body: [Variable Assignment: res = (res * n), Variable Assignment: n = (n - 1: u32)], Return: res]]
