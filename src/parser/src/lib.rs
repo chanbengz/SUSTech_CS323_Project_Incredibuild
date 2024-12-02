@@ -189,12 +189,4 @@ mod tests {
         //        &format!("../test/phase1/test_1_s{}.out", i));
         //}
     }
-
-    // #[test]
-    // fn test_phase2() {
-    // }
-
-    // #[test]
-    // fn test_phase3() {
-    // }
 }

@@ -467,7 +467,11 @@ pub CompExpr: Box<tree::CompExpr> = {
         ))
     },
 
-    <lhs:CompExpr> "-" <rhs:CompExpr> => {
+    <lhs:CompExpr?> "-" <rhs:CompExpr> => {
+        let lhs = match lhs {
+            Some(x) => x,
+            None => Box::new(tree::CompExpr::Value(tree::Value::Integer(0)))
+        };
         Box::new(tree::CompExpr::BinaryOperation (
             lhs, tree::BinaryOperator::Sub, rhs
         ))
