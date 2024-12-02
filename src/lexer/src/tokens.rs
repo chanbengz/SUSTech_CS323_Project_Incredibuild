@@ -180,7 +180,7 @@ pub enum Token {
     })]
     #[regex(r"'\\u[0-9a-fA-F]{1,6}'", |lex| {
         let slice = lex.slice();
-        let hex_part = &slice[3..slice.len() - 1]; // Extract the hex part after \x
+        let hex_part = &slice[3..slice.len() - 1]; // Extract the hex part after \u
         match u32::from_str_radix(hex_part, 16) {
             Ok(u) => {
                 match std::char::from_u32(u) {

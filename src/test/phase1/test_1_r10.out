@@ -1,0 +1,2 @@
+Functions: Function: test_1_r10:[Body: [Variable Declaration: a = [0: i32] with dimensions []; Variable Declaration: b = [0: i32] with dimensions []; Variable Assignment: b = 1: i32, Variable Assignment: a = 10: i32, Variable Declaration: i = [0: i32] with dimensions []; Variable Assignment: i = 0: i32, While Loop (Condition: i < a): 
+ do Body: [Variable Assignment: b = (b + i), Variable Assignment: i = (i + 1: i32)]]]

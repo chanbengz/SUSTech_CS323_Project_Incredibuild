@@ -104,11 +104,10 @@ FieldsDec: Vec<tree::Variable> = {
         }
         field
     },
-    <field:VarDef> ";" <fields:FieldsDec> => {
-        let mut v = field.clone();
-        v.extend(fields);
-        v
-    }
+    <mut fields:FieldsDec> <v:VarDef> ";" => {
+        fields.extend(v);
+        fields
+    },
 }
 
 /*
@@ -375,7 +374,8 @@ StructDec: tree::Variable = {
             val,
             Box::new(Vec::new())
         )
-    }
+    },
+    ! => { errors.push(<>); tree::Variable::Error },
 }
 
 pub CondExpr: Box<tree::CondExpr> = {

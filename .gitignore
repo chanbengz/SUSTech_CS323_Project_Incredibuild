@@ -19,5 +19,5 @@ Cargo.lock
 # Added by Cargo
 target
 
-# Test
-src/test/test
+# IDEA
+.idea

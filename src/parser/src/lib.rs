@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn test_phase1() {
-        for i in 1..10 {
+        for i in 1..13 {
             assert_parse_from_file(Parser::ProgramParser, 
                 &format!("../test/phase1/test_1_r{:0>2}.spl", i), 
                 &format!("../test/phase1/test_1_r{:0>2}.out", i));
