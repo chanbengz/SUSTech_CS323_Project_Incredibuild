@@ -107,8 +107,7 @@ impl fmt::Display for Value {
             Value::String(s) => write!(f, "{}: String", s),
             Value::Char(c) => write!(f, "{}: char", c),
             Value::Bool(b) => write!(f, "{}: bool", b),
-            Value::Null => write!(f, "null"),
-            Value::Error => write!(f, "[ValueError]"),
+            Value::Null => write!(f, "null")
         }
     }
 }
