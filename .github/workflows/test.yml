@@ -26,3 +26,7 @@ jobs:
     - name: Test Lexer
       run: cargo test --verbose
       working-directory: src/lexer
+
+    - name: Test Analyzer
+      run: cargo test --verbose
+      working-directory: src/analyzer
