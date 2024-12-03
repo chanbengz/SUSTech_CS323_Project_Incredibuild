@@ -25,9 +25,9 @@ pub enum Variable {
     // (identifier, values, dimensions)
     // Variable can be used to declare a variable or reference a variable.
     // Variable can be a single value or an array.
-    VarReference(Box<String>, Box<Vec<CompExpr>>),
-    VarDeclaration(Box<String>, Box<Vec<Value>>, Box<Vec<CompExpr>>),
-    VarAssignment(Box<String>, Box<CompExpr>, Box<Vec<CompExpr>>),
+    VarReference(Box<String>, Box<Vec<CompExpr>>), // varname, offsets
+    VarDeclaration(Box<String>, Box<Value>, Box<Vec<CompExpr>>), // varname, type, offsets
+    VarAssignment(Box<String>, Box<CompExpr>, Box<Vec<CompExpr>>), // varname, expr, offsets
 
     // Struct is defined to realize object.
     StructReference(Box<String>),
@@ -38,15 +38,15 @@ pub enum Variable {
     StructAssignment(Box<String>, Box<String>, Box<CompExpr>),
 
     MemberReference(Box<String>, Box<String>),
-    FormalParameter(Box<String>, Box<Vec<Value>>, Box<Vec<usize>>),
+    FormalParameter(Box<String>, Box<Value>, Box<Vec<usize>>),
     Error
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Function {
     // (identifier, input_params, output_params, body)
-    FuncReference(Box<String>, Box<Vec<Box<CompExpr>>>),
-    FuncDeclaration(Box<String>, Box<Vec<Variable>>, Box<Value>, Body),
+    FuncReference(Box<String>, Vec<Box<CompExpr>>),
+    FuncDeclaration(Box<String>, Vec<Variable>, Box<Value>, Body),
     Error
 }
 
