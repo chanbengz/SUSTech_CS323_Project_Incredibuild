@@ -101,7 +101,8 @@ mod tests {
         // Test conditional expression
         assert_parse(Parser::CondExprParser, "2 > 4", "Condition: 2: u32 > 4: u32"); 
         // Test conbination of condexpr
-        assert_parse(Parser::CondExprParser, "true && (5 < 6 || 2 > 5)", "Condition: Condition: true && Condition: Condition: 5: u32 < 6: u32 || Condition: 2: u32 > 5: u32");
+        assert_parse(Parser::CondExprParser, "true && (5 < 6 || 2 > 5)",
+            "Condition: Condition: true && Condition: Condition: 5: u32 < 6: u32 || Condition: 2: u32 > 5: u32");
     }
 
     #[test]
@@ -146,8 +147,10 @@ mod tests {
         assert_parse(Parser::FuncDecParser, "int func(int a, int b) { for(int i = 0; i < 10; i = i + 1) { a = a + 1; }}", 
         "Function: func:[Body: [For Loop ([Initial] Variable Declaration: i = [0: u32] with dimensions []; Variable Assignment: i = 0: u32; [Condition] Condition: i < 10: u32; [Increment] Variable Assignment: i = (i + 1: u32)): \n do Body: [Variable Assignment: a = (a + 1: u32)]]]");    
         // Test break and continue
-        assert_parse(Parser::FuncDecParser, "int func(int a, int b) { while(a > b) { if (a == 5) { break; } continue; }}", 
+        assert_parse(Parser::FuncDecParser, "int func(int a, int b) { while(a > b) { if (a == 5) { break; } continue; }}",
         "Function: func:[Body: [While Loop (Condition: a > b):\ndo Body: [If: Condition: a == 5: u32 then Body: [Break], Continue]]]");
+        assert_parse(Parser::FuncDecParser, "int func(int a, int b) { int c = 0; {int d = c;} }",
+            "Function: func:[Body: [Variable Declaration: c = [0: u32] with dimensions []; Variable Assignment: c = 0: u32, \nNested Body: [Variable Declaration: d = [0: u32] with dimensions []; Variable Assignment: d = c]]]")
     }
 
     #[test]

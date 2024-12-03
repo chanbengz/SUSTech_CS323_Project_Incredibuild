@@ -175,6 +175,7 @@ Expr: tree::Expr = {
         None => tree::Expr::Return(tree::CompExpr::Value(tree::Value::Null)),
         Some(val) => tree::Expr::Return(*val)
     },
+    "{" <expr:Body> "}" => tree::Expr::Body(expr),
     ! => {
         let error = <>;
         match &error.error {
@@ -197,17 +198,21 @@ Expr: tree::Expr = {
 
 IfExpr: tree::Expr = {
     "if" "(" <cond:CondExpr> ")" <body:Expr>  => {
-        tree::Expr::If(
-            tree::If::IfExpr(cond, tree::Body::Body(vec![body]))
-        )
-    },
-    "if" "(" <cond:CondExpr> ")" "{" <body:Body> "}" => {
-        tree::Expr::If(
-            tree::If::IfExpr(
-                cond,
-                body
-            )
-        )
+        match body {
+            tree::Expr::Body(body) => {
+                tree::Expr::If(
+                    tree::If::IfExpr(
+                        cond,
+                        body
+                    )
+                )
+            },
+            _ => {
+                tree::Expr::If(
+                    tree::If::IfExpr(cond, tree::Body::Body(vec![body]))
+                )
+            }
+        }
     },
     "if" "(" <cond:CondExpr> ")" "{" <body:Body> "}" "else" "{" <body_2:Body> "}" => {
         tree::Expr::If(

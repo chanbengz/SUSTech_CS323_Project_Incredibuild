@@ -141,6 +141,7 @@ pub enum Expr{
     Loop(Loop),
     VarManagement(Vec<Variable>),
     FuncCall(Function),
+    Body(Body),
     Break,
     Continue,
     Return(CompExpr),

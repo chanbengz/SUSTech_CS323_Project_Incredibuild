@@ -194,6 +194,7 @@ impl fmt::Display for Expr {
             Expr::Loop(loop_expr) => write!(f, "{}", loop_expr),
             Expr::Break => write!(f, "Break"),
             Expr::Continue => write!(f, "Continue"),
+            Expr::Body(body) => write!(f, "\nNested {}", body),
             Expr::Return(val) => write!(f, "Return: {}", val),
             Expr::FuncCall(func) => write!(f, "{}", func),
             Expr::VarManagement(vars) => write!(f, "{}", 
