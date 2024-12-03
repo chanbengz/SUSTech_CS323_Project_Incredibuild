@@ -509,7 +509,6 @@ pub CompExpr: Box<tree::CompExpr> = {
 Specifier: tree::Value = {
     <t:"typeint"> => tree::Value::Integer(0),
     <t:"typefloat"> => tree::Value::Float(0.0),
-    <t:"typebool"> => tree::Value::Bool(false),
     <t:"typechar"> => tree::Value::Char(' '),
     <t:"typestr"> => tree::Value::String(String::new()),
     <t:"void"> => tree::Value::Null,
@@ -603,7 +602,6 @@ extern {
         "string" => Token::LiteralString(<String>),
         "typeint" => Token::TypeInt,
         "typefloat" => Token::TypeFloat,
-        "typebool" => Token::TypeBool,
         "typechar" => Token::TypeChar,
         "typestr" => Token::TypeString,
         "void" => Token::TypeVoid,

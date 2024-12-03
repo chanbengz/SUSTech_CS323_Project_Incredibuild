@@ -140,8 +140,6 @@ pub enum Token {
     DeclarationInclude,
 
     // Type
-    #[token("bool")]
-    TypeBool,
     #[token("char")]
     TypeChar,
     #[token("string")]

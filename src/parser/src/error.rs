@@ -1,4 +1,3 @@
-use std::fmt::format;
 use spl_lexer::tokens::{Token, LexicalError};
 use lalrpop_util::ErrorRecovery;
 

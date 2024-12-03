@@ -226,10 +226,9 @@ mod test {
     fn types_easy() {
         assert_lex(
             "
-                bool int string char float null
+                int string char float null
             ",
              &[
-                (TypeBool, "bool"),
                 (TypeInt, "int"),
                 (TypeString, "string"),
                 (TypeChar, "char"),
