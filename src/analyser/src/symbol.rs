@@ -1,41 +1,68 @@
-use spl_ast::tree::Value;
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Symbol<T> {
 	pub id: i32, // Unique identifier
 	pub is_global: bool,
 	pub identifier: String, // Symbol Table Key
 	pub symbol_type: T, // VarType + FuncType
-	pub symbol_table_next: Option<Box<Symbol<T>>>, // Next symbol with the same key
-	pub scope_stack_next: Option<Box<Symbol<T>>>, // Next symbol in the same scope stack
 }
+
+pub type VarSymbol = Symbol<VarType>;
+pub type FuncSymbol = Symbol<FuncType>;
 
 /*
 	There are in total two kinds of Symbol Type:
-	- Variable Type
-		- Primitive Type (type_t, Value)
+	- Variable Type `VarType`
+		- Primitive Type `(BasicType, Value)`
 			- Int
 			- Char
 			- Float
 			- Bool
 			- String
-			- Null
-		- Array Type (type_t, Vec<usize>, Vec<PrimitiveType>)
-		- Struct Type (Vec<PrimitiveType  + Array Type>)
-	- Function Type
-		- (Return Type, Vec<VarType>)
+		- Array Type `(Vec<usize>, Vec<Value>)`
+		- Struct Type `(Vec<VarType>)`
+	- Function Type `FuncType`
+		- `(FuncReturnType, Vec<VarType>)`
+	Different　Symbols are stored in different Symbol Tables.
 */
-pub type VarType = PrimType + ArrayType + StructType;
-pub type FuncType = (PrimType, Vec<VarType>);
-pub type PrimType = (Type, Value);
-pub type ArrayType = (Vec<usize>, Vec<PrimType>);
-pub type StructType = Vec<VarType>;
+#[derive(Clone, Debug)]
+pub enum VarType {
+	Primitive(PrimType),
+	Array(ArrayType),
+	Struct(StructType)
+}
 
-pub enum Type {
+pub type PrimType = (BasicType, Val);
+pub type ArrayType = (BasicType, Vec<Val>, Vec<usize>);
+pub type StructType = (Vec<String>, Vec<VarType>);
+pub type FuncType = (FuncReturnType, Vec<VarType>);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BasicType {
 	Int,
 	Char,
 	Float,
 	Bool,
 	String,
 	Null
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum FuncReturnType {
+	Int,
+	Char,
+	Float,
+	Bool,
+	String,
+	#[default]
+	Void
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub enum Val {
+	Int(i32),
+	Char(char),
+	Float(f32),
+	Bool(bool),
+	String(String),
+	Array(ArrayType)
 }
