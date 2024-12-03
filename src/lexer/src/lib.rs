@@ -129,7 +129,7 @@ mod test {
     fn literals() {
         assert_lex(
             r#"
-                true false 0 42 0xDEAD 0Xdead 3.14 .12345 500.1 10.000 'f' '\u2764' "doge to the moon"
+                true false 0 42 0xDEAD 0Xdead 3.14 .12345 500.1 10.000 'f' "doge to the moon"
             "#,
              &[
                 (LiteralBool(true), "true"),
@@ -143,7 +143,6 @@ mod test {
                 (LiteralFloat(500.1), "500.1"),
                 (LiteralFloat(10.000), "10.000"),
                 (LiteralChar(char::from('f')), "'f'"),
-                (LiteralChar(char::from('❤')), r"'\u2764'"),
                 (LiteralString(String::from("doge to the moon")), r#""doge to the moon""#),
             ][..]
         );
@@ -289,7 +288,7 @@ mod test {
     #[test]
     fn test_func() {
         let source = r#"
-            int func(int a, int b) { if (a > b) { return a; } else { return b; } }"#;
+            int func(int a, int b) { int 0_wrong_id; if (a > b) { return a; } else { return b; } }"#;
        assert_lex(source, &[
             (TypeInt, "int"),
             (Identifier(String::from("func")), "func"),
@@ -301,6 +300,9 @@ mod test {
             (Identifier(String::from("b")), "b"),
             (RightParen, ")"),
             (LeftBrace, "{"),
+            (TypeInt, "int"),
+            (Invalid, "0_wrong_id"),
+            (Semicolon, ";"),
             (KeywordIf, "if"),
             (LeftParen, "("),
             (Identifier(String::from("a")), "a"),

@@ -24,7 +24,9 @@ impl<'input> Iterator for Lexer<'input> {
         .map(|(token, span)|
         match token {
             Ok(token) => Ok((span.start, token, span.end)),
-            Err(_) => Ok((span.start, Token::Error, span.end)),
+            Err(LexicalError::UnknownToken) => Ok((span.start, Token::Error, span.end)),
+            Err(LexicalError::InvalidCharacter(_)) => Ok((span.start, Token::Error, span.end)),
+            _ => Ok((span.start, Token::Error, span.end)),
         })
     }
 }  

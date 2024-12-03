@@ -34,12 +34,10 @@ Comma<T>: Vec<T> = {
 };
 
 ParaDec: tree::Variable = {
-    <spec:Specifier> <name:"identifier"> => {
-        let mut values = Vec::new();
-        values.push(spec);
+    <spec:Specifier> <name:Identifier> => {
         tree::Variable::FormalParameter(
             Box::new(name),
-            Box::new(values),
+            Box::new(spec),
             Box::new(Vec::new())
         )
     }
@@ -67,7 +65,7 @@ DimDecs: Vec<tree::CompExpr> = {
 * 4. TODO: macro definition 
 */
 pub Stmt: tree::Statement = {
-    "struct" <name:"identifier"> "{" <fields:FieldsDec> "}" ";" => {
+    "struct" <name:Identifier> "{" <fields:FieldsDec> "}" ";" => {
         tree::Statement::Struct(
             tree::Variable::StructDefinition(
                 Box::new(name),
@@ -117,11 +115,11 @@ FieldsDec: Vec<tree::Variable> = {
 * 3. Body: { Expr* }
 */
 pub FuncDec: Box<tree::Function> = {
-    <ret: Specifier> <name:"identifier"> <lb:"("> <params:ParaDecs> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> "}" => {
+    <ret: Specifier> <name:Identifier> <l:@L> <lb:"("> <params:ParaDecs> <rb:")"?> <r:@R> "{" <body:Body> "}" => {
         if rb == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
-                    error: LexicalError::MissingLexeme(l, "closing parenthesis ')'".to_string(), r)
+                    error: LexicalError::MissingLexeme(l, "')'".to_string(), r)
                 },
                 dropped_tokens: Vec::new(), // or specify the dropped tokens
             };
@@ -129,7 +127,7 @@ pub FuncDec: Box<tree::Function> = {
         }
         Box::new(tree::Function::FuncDeclaration(
             Box::new(name),
-            Box::new(params),
+            params,
             Box::new(ret),
             body
         ))
@@ -138,11 +136,11 @@ pub FuncDec: Box<tree::Function> = {
 }
 
 FuncCall: tree::Expr = {
-    <name:"identifier"> "(" <args:ArgList> ")" ";" => {
+    <name:Identifier> "(" <args:ArgList> ")" ";" => {
         tree::Expr::FuncCall(
             tree::Function::FuncReference(
                 Box::new(name),
-                Box::new(args)
+                args
             )
         )
     }
@@ -169,18 +167,40 @@ Expr: tree::Expr = {
     <expr:IfExpr> => expr,
     <expr:WhileExpr> => expr,
     <expr:ForExpr> => expr,
-    <expr:VarManagement> ";" => expr,
     <expr:FuncCall> => expr,
+    <expr:VarManagement> ";" => expr,
     <expr:"break"> ";" => tree::Expr::Break,
     <expr:"continue"> ";" => tree::Expr::Continue,
     <expr:"return"> <val:CompExpr?> ";" => match val {
         None => tree::Expr::Return(tree::CompExpr::Value(tree::Value::Null)),
         Some(val) => tree::Expr::Return(*val)
     },
-    ! => { errors.push(<>); tree::Expr::Error }
+    ! => {
+        let error = <>;
+        match &error.error {
+            ParseError::UnrecognizedToken { token, expected } => {
+                if expected.contains(&"\";\"".to_string()) {
+                    let error = ErrorRecovery {
+                        error: ParseError::User {
+                            error: LexicalError::MissingLexeme(token.0, "';'".to_string(), token.2)
+                        },
+                        dropped_tokens: Vec::new(),
+                    };
+                    errors.push(error);
+                }
+            },
+            _ => {}
+        }
+        tree::Expr::Error
+    }
 }
 
 IfExpr: tree::Expr = {
+    "if" "(" <cond:CondExpr> ")" <body:Expr>  => {
+        tree::Expr::If(
+            tree::If::IfExpr(cond, tree::Body::Body(vec![body]))
+        )
+    },
     "if" "(" <cond:CondExpr> ")" "{" <body:Body> "}" => {
         tree::Expr::If(
             tree::If::IfExpr(
@@ -243,7 +263,7 @@ VarManagement: tree::Expr = {
             vec![def]
         )
     },
-    <obj: "identifier"> "." <field: "identifier"> "=" <val:CompExpr> => {
+    <obj: Identifier> "." <field: Identifier> "=" <val:CompExpr> => {
         tree::Expr::VarManagement(
             vec![tree::Variable::StructAssignment(
                 Box::new(obj.clone()),
@@ -252,7 +272,7 @@ VarManagement: tree::Expr = {
             )]
         )
     },
-    <lhs:"identifier"> <dims:DimDecs?> "++" => {
+    <lhs:Identifier> <dims:DimDecs?> "++" => {
         let dims = match dims {
             Some(dims) => dims,
             None => Vec::new()
@@ -269,7 +289,7 @@ VarManagement: tree::Expr = {
             )]
         )
     },
-    <lhs:"identifier"> <dims:DimDecs?> "--" => {
+    <lhs:Identifier> <dims:DimDecs?> "--" => {
         let dims = match dims {
             Some(dims) => dims,
             None => Vec::new()
@@ -292,14 +312,14 @@ VarManagement: tree::Expr = {
 // You should be able to declare multiple variables at once
 // However, some varaibles is declared with initial value, then it should be treated as assignment
 VarDef: Vec<tree::Variable> = {
-    "struct" <str: "identifier"> <name:"identifier"> => {
+    "struct" <str: Identifier> <name:Identifier> => {
         vec![tree::Variable::StructDeclaration(
             Box::new(str),
             Box::new(name),
             Box::new(Vec::new())
         )]
     },
-    "struct" <str: "identifier"> <name:"identifier"> "{" <fields:StructDecs> "}"=> {
+    "struct" <str: Identifier> <name:Identifier> "{" <fields:StructDecs> "}"=> {
         vec![tree::Variable::StructDeclaration(
             Box::new(str),
             Box::new(name),
@@ -310,23 +330,12 @@ VarDef: Vec<tree::Variable> = {
         let mut variables = Vec::new();
         var.iter().for_each(|x| {
             match x {
-                tree::Variable::VarDeclaration(name, values, size) => {
-                    let mut values = Vec::new();
-                    let mut scale = 1;
-                    size.iter().for_each(|x| {
-                        match x {
-                            tree::CompExpr::Value(tree::Value::Integer(x)) => scale *= x,
-                            _ => () // add error handling here?
-                        }
-                    });
-                    for _ in 0..scale {
-                        values.push(spec.clone());
-                    }
-                    variables.push(tree::Variable::VarDeclaration(name.clone(), Box::new(values), size.clone()));
+                tree::Variable::VarDeclaration(name, value, size) => {
+                    variables.push(tree::Variable::VarDeclaration(name.clone(), Box::new(spec.to_owned()), size.clone()));
                 },
                 tree::Variable::VarAssignment(name, value, dims) => {
-                    variables.push(tree::Variable::VarDeclaration(name.clone(), Box::new(vec![spec.clone()]), Box::new(Vec::new())));
-                    variables.push(tree::Variable::VarAssignment(name.clone(), value.clone(), dims.clone()));
+                    variables.push(tree::Variable::VarDeclaration(name.clone(), Box::new(spec.to_owned()), Box::new(Vec::new())));
+                    variables.push(tree::Variable::VarAssignment(name.clone(), value.to_owned(), dims.clone()));
                 },
                 _ => {}
             }
@@ -339,20 +348,19 @@ VarDef: Vec<tree::Variable> = {
 // 1. identifier; => specifier ident;
 // 2. identifier[size][size]...; => specifier ident[size][size]...;
 // 3. identifier = CompExpr; => specifier ident = CompExpr;
-// TODO: 4. identifier[size] = {values..}
 VarDec: tree::Variable = {
-    <ident: "identifier"> <size: DimDecs?> => {
+    <ident: Identifier> <size: DimDecs?> => {
         let dims = match size {
             Some(dims) => dims,
             None => Vec::new()
         };
         tree::Variable::VarDeclaration(
             Box::new(ident),
-            Box::new(Vec::new()),
+            Box::new(tree::Value::Null),
             Box::new(dims)
         )
     },
-    <ident: "identifier"> <size: DimDecs?> "=" <val:CompExpr> => {
+    <ident: Identifier> <size: DimDecs?> "=" <val:CompExpr> => {
         let dims = match size {
             Some(dims) => dims,
             None => Vec::new()
@@ -368,7 +376,7 @@ VarDec: tree::Variable = {
 StructDecs = Comma<StructDec>;
 
 StructDec: tree::Variable = {
-    "." <ident: "identifier"> ":" <val: CompExpr> => {
+    "." <ident: Identifier> ":" <val: CompExpr> => {
         tree::Variable::VarAssignment(
             Box::new(ident),
             val,
@@ -380,12 +388,12 @@ StructDec: tree::Variable = {
 
 pub CondExpr: Box<tree::CondExpr> = {
 #[precedence(level="1")]
+    CondTerm,
     "!" <expr:CondExpr> => {
         Box::new(tree::CondExpr::UnaryCondition(
             tree::UnaryOperator::Not, expr
         ))
     },
-    CondTerm,
 #[precedence(level="2")]
     <lhs:CompExpr> ">" <rhs:CompExpr> => {
         Box::new(tree::CondExpr::Condition(
@@ -435,6 +443,17 @@ pub CompExpr: Box<tree::CompExpr> = {
     Term,
 
     #[precedence(level="2")] #[assoc(side="left")]
+    <lhs: CompExpr> <l:@L> <error: "error"> <r:@R> <rhs:CompExpr> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::UnknownLexeme(l, r)
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        Box::new(tree::CompExpr::Error)
+    },
+
     <lhs:CompExpr> "^" <rhs:CompExpr> => {
         Box::new(tree::CompExpr::BinaryOperation (
             lhs, tree::BinaryOperator::Pow, rhs
@@ -461,7 +480,11 @@ pub CompExpr: Box<tree::CompExpr> = {
     },
 
     #[precedence(level="4")] #[assoc(side="left")]
-    <lhs:CompExpr> "+" <rhs:CompExpr> => {
+    <lhs:CompExpr?> "+" <rhs:CompExpr> => {
+        let lhs = match lhs {
+             Some(x) => x,
+             None => Box::new(tree::CompExpr::Value(tree::Value::Integer(0)))
+        };
         Box::new(tree::CompExpr::BinaryOperation (
             lhs, tree::BinaryOperator::Add, rhs
         ))
@@ -489,7 +512,7 @@ Specifier: tree::Value = {
 
 Term: Box<tree::CompExpr> = {
     "(" <CompExpr> ")",
-    <n: "identifier"> <dims:DimDecs?> => {
+    <n: Identifier> <dims:DimDecs?> => {
         match dims {
             Some(dims) => Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(n), Box::new(dims)))),
             None => Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(n), Box::new(Vec::new())))),
@@ -498,9 +521,9 @@ Term: Box<tree::CompExpr> = {
     <n: "int"> => Box::new(tree::CompExpr::Value(tree::Value::Integer(n))),
     <n: "float"> => Box::new(tree::CompExpr::Value(tree::Value::Float(n))),
     <n: "char"> => Box::new(tree::CompExpr::Value(tree::Value::Char(n))),
-    <ident: "identifier"> "(" <args:ArgList> ")" => {
+    <ident: Identifier> "(" <args:ArgList> ")" => {
         Box::new(tree::CompExpr::FuncCall(
-            tree::Function::FuncReference(Box::new(ident), Box::new(args))
+            tree::Function::FuncReference(Box::new(ident), args)
         ))
     },
 
@@ -515,12 +538,50 @@ Term: Box<tree::CompExpr> = {
         errors.push(error);
         Box::new(tree::CompExpr::Error)
     },
-    ! => { errors.push(<>); Box::new(tree::CompExpr::Error) },
+    ! => {
+        let error = <>;
+        match &error.error {
+            ParseError::UnrecognizedToken { token, expected } => {
+                let error = if expected.contains(&"\")\"".to_string()) {
+                    ErrorRecovery {
+                        error: ParseError::User {
+                            error: LexicalError::MissingLexeme(token.0, "')'".to_string(), token.2)
+                        },
+                        dropped_tokens: Vec::new(),
+                    }
+                } else {
+                    ErrorRecovery {
+                        error: ParseError::User {
+                            error: LexicalError::MissingLexeme(token.0, "Exp".to_string(), token.2)
+                        },
+                        dropped_tokens: Vec::new(),
+                    }
+                };
+                errors.push(error);
+            },
+            _ => {}
+        }
+        Box::new(tree::CompExpr::Error)
+    },
 }
 
 CondTerm: Box<tree::CondExpr> = {
     <n: "bool"> => Box::new(tree::CondExpr::Bool(n)),
     "(" <CondExpr> ")",
+}
+
+Identifier: String = {
+    "identifier",
+    <l:@L> "invalid" <r:@R> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::UnknownLexeme(l, r)
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        "INVALID".to_string()
+    }
 }
 
 extern {
@@ -585,6 +646,7 @@ extern {
         "struct" => Token::DeclarationStruct,
         "include" => Token::DeclarationInclude,
 
+        "invalid" => Token::Invalid,
         "error" => Token::Error,
     }
 }

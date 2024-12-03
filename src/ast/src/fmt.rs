@@ -33,14 +33,14 @@ impl fmt::Display for Statement {
 impl fmt::Display for Variable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Variable::VarDeclaration(ident, values, dims) => write!(f, "Variable Declaration: {} = [{}] with dimensions [{}]", 
-                ident, 
-                values.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", "), 
+            Variable::VarDeclaration(ident, value, dims) => write!(f, "Variable Declaration: {} = [{}] with dimensions [{}]",
+                ident,
+                value,
                 dims.iter().map(|d| d.to_string()).collect::<Vec<String>>().join(", ")),
             Variable::MemberReference(ident, member) => write!(f, "{}.{}", ident, member),
-            Variable::FormalParameter(ident, values, dims) => write!(f, "Formal Parameter: {} = [{}] with dimensions [{}]", 
-                ident, 
-                values.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", "), 
+            Variable::FormalParameter(ident, value, dims) => write!(f, "Formal Parameter: {} = [{}] with dimensions [{}]",
+                ident,
+                value,
                 dims.iter().map(|d| d.to_string()).collect::<Vec<String>>().join(", ")),
             Variable::VarReference(ident, dims) => write!(f, "{}{}", ident, 
                 dims.iter().map(|d| format!("[{}]", d)).collect::<Vec<String>>().join("")),

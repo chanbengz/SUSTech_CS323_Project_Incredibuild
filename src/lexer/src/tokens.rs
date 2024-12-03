@@ -163,28 +163,8 @@ pub enum Token {
     #[regex(r"(0|[1-9][0-9]*)", |lex| lex.slice().parse::<u32>().unwrap())]
     #[regex(r"0[xX][0-9a-fA-F]+", process_hex)]
     LiteralInt(u32),
-    #[regex(r"'.'", |lex| {
-        let slice = lex.slice();
-        let c = slice.chars().nth(1).unwrap();
-        if c.is_ascii() {
-            Ok(c)
-        } else {
-            Err(LexicalError::NonAsciiCharacter)
-        }
-    })]
-    #[regex(r"'\\[xu][0-9a-fA-F]{1,6}'", |lex| {
-        let slice = lex.slice();
-        let hex_part = &slice[3..slice.len() - 1]; // Extract the hex part after \u
-        match u32::from_str_radix(hex_part, 16) {
-            Ok(u) => {
-                match std::char::from_u32(u) {
-                    Some(c) => Ok(c),
-                    None => return Err(LexicalError::InvalidCharacter(format!("Invalid Unicode character: {}", u))),
-                }
-            }
-            Err(e) => return Err(LexicalError::InvalidCharacter(format!("{:?}", e))),
-        }
-    })]
+
+    #[token("'", process_char)]
     LiteralChar(char),
     #[regex(r#""([^"\\]|\\["\\bnfrt]|\\x[0-9a-fA-F]{2}|\\u[a-fA-F0-9]{1,6})*""#, process_string)]
     LiteralString(String),
@@ -199,7 +179,28 @@ pub enum Token {
     BlockComment,
 
     // error handling
+    #[regex(r"(0|[1-9][0-9]*)[a-zA-Z_][a-zA-Z0-9_]*")]
+    Invalid,
     Error
+}
+
+fn process_char(lex: &mut logos::Lexer<Token>) -> Result<char, LexicalError> {
+    if let Some(len) = lex.remainder().find("'")  {
+        lex.bump(len + 1);
+        let slice = &lex.slice()[1..len + 1];
+        if len == 1 {
+            Ok(slice.chars().next().unwrap())
+        } else if &slice[..2] == "\\x" {
+            match u8::from_str_radix(&slice[2..], 16) {
+                Ok(byte) => Ok(byte as char),
+                Err(_) => Err(LexicalError::InvalidCharacter(format!("Invalid hexadecimal character: {}", slice))),
+            }
+        } else {
+            Err(LexicalError::InvalidCharacter(format!("Invalid character: {}", slice)))
+        }
+    } else {
+        Err(LexicalError::UnexpectedEndOfProgram)
+    }
 }
 
 fn process_hex(lex: &mut logos::Lexer<Token>) -> Result<u32, LexicalError> {

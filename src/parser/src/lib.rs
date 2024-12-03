@@ -195,10 +195,10 @@ mod tests {
                 &format!("../test/phase1/test_1_r{:0>2}.spl", i), 
                 &format!("../test/phase1/test_1_r{:0>2}.out", i));
         }
-        //for i in 1..6 {
-        //    assert_parse_from_file(Parser::ProgramParser, 
-        //        &format!("../test/phase1/test_1_s{}.spl", i), 
-        //        &format!("../test/phase1/test_1_s{}.out", i));
-        //}
+        for i in 1..14 {
+           assert_parse_from_file(Parser::ProgramParser,
+               &format!("../test/phase1/test_1_s{:0>2}.spl", i),
+               &format!("../test/phase1/test_1_s{:0>2}.out", i));
+        }
     }
 }
