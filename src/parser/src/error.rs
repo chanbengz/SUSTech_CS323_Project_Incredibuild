@@ -1,3 +1,4 @@
+use std::fmt::format;
 use spl_lexer::tokens::{Token, LexicalError};
 use lalrpop_util::ErrorRecovery;
 
@@ -30,6 +31,7 @@ pub fn display_error(errors: &Vec<ErrorRecovery<usize, Token, LexicalError>>, in
                         let expected_str = match token.as_str() {
                             "';'" => format!("semicolon {}", token),
                             "')'" => format!("closing parenthesis {}", token),
+                            "Exp" => format!("{} after {}", token, input[last-1..last].to_owned()),
                             _ => token.to_owned(),
                         };
                         let lineno = input[..*r].lines().count() - ((input.as_bytes()[last - 1] == 10) as usize);

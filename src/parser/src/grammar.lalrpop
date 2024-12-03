@@ -480,7 +480,11 @@ pub CompExpr: Box<tree::CompExpr> = {
     },
 
     #[precedence(level="4")] #[assoc(side="left")]
-    <lhs:CompExpr> "+" <rhs:CompExpr> => {
+    <lhs:CompExpr?> "+" <rhs:CompExpr> => {
+        let lhs = match lhs {
+             Some(x) => x,
+             None => Box::new(tree::CompExpr::Value(tree::Value::Integer(0)))
+        };
         Box::new(tree::CompExpr::BinaryOperation (
             lhs, tree::BinaryOperator::Add, rhs
         ))
@@ -534,7 +538,31 @@ Term: Box<tree::CompExpr> = {
         errors.push(error);
         Box::new(tree::CompExpr::Error)
     },
-    ! => { errors.push(<>); Box::new(tree::CompExpr::Error) },
+    ! => {
+        let error = <>;
+        match &error.error {
+            ParseError::UnrecognizedToken { token, expected } => {
+                let error = if expected.contains(&"\")\"".to_string()) {
+                    ErrorRecovery {
+                        error: ParseError::User {
+                            error: LexicalError::MissingLexeme(token.0, "')'".to_string(), token.2)
+                        },
+                        dropped_tokens: Vec::new(),
+                    }
+                } else {
+                    ErrorRecovery {
+                        error: ParseError::User {
+                            error: LexicalError::MissingLexeme(token.0, "Exp".to_string(), token.2)
+                        },
+                        dropped_tokens: Vec::new(),
+                    }
+                };
+                errors.push(error);
+            },
+            _ => {}
+        }
+        Box::new(tree::CompExpr::Error)
+    },
 }
 
 CondTerm: Box<tree::CondExpr> = {
