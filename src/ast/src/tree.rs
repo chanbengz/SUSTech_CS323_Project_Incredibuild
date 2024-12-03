@@ -80,8 +80,7 @@ pub enum Value {
     String(String),
     Char(char),
     Bool(bool),
-    Null,
-    Error
+    Null
 }
 
 #[derive(Clone, Debug, PartialEq)]
