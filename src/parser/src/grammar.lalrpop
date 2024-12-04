@@ -164,7 +164,55 @@ pub Body: tree::Body = {
 }
 
 Expr: tree::Expr = {
-    <expr:IfExpr> => expr,
+    <expr:OpenExpr> => expr,
+    <expr:CloseExpr> => expr,
+}
+
+OpenExpr: tree::Expr = {
+    "if" "(" <cond:CondExpr> ")" <body:Expr> => {
+        let body = match body {
+            tree::Expr::Body(body) => body,
+            _ => tree::Body::Body(vec![body])
+        };
+        tree::Expr::If(tree::If::IfExpr(cond, body))
+    },
+    "if" "(" <cond:CondExpr> ")" <body:CloseExpr> "else" <body_2:OpenExpr> => {
+        let body = match body {
+            tree::Expr::Body(body) => body,
+            _ => tree::Body::Body(vec![body])
+        };
+        let body_2 = match body_2 {
+            tree::Expr::Body(body) => body,
+            _ => tree::Body::Body(vec![body_2])
+        };
+        tree::Expr::If(
+            tree::If::IfElseExpr(
+                cond,
+                body,
+                body_2
+            )
+        )
+    },
+}
+
+CloseExpr: tree::Expr = {
+    "if" "(" <cond:CondExpr> ")" <body:CloseExpr> "else" <body_2:CloseExpr> => {
+        let body = match body {
+            tree::Expr::Body(body) => body,
+            _ => tree::Body::Body(vec![body])
+        };
+        let body_2 = match body_2 {
+            tree::Expr::Body(body) => body,
+            _ => tree::Body::Body(vec![body_2])
+        };
+        tree::Expr::If(
+            tree::If::IfElseExpr(
+                cond,
+                body,
+                body_2
+            )
+        )
+    },
     <expr:WhileExpr> => expr,
     <expr:ForExpr> => expr,
     <expr:FuncCall> => expr,
@@ -193,35 +241,6 @@ Expr: tree::Expr = {
             _ => {}
         }
         tree::Expr::Error
-    }
-}
-
-IfExpr: tree::Expr = {
-    "if" "(" <cond:CondExpr> ")" <body:Expr>  => {
-        match body {
-            tree::Expr::Body(body) => {
-                tree::Expr::If(
-                    tree::If::IfExpr(
-                        cond,
-                        body
-                    )
-                )
-            },
-            _ => {
-                tree::Expr::If(
-                    tree::If::IfExpr(cond, tree::Body::Body(vec![body]))
-                )
-            }
-        }
-    },
-    "if" "(" <cond:CondExpr> ")" "{" <body:Body> "}" "else" "{" <body_2:Body> "}" => {
-        tree::Expr::If(
-            tree::If::IfElseExpr(
-                cond,
-                body, 
-                body_2
-            )
-        )
     }
 }
 
