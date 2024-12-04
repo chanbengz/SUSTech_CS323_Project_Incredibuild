@@ -10,14 +10,19 @@ pub fn display_error(errors: &Vec<ErrorRecovery<usize, Token, LexicalError>>, in
                 let expected_str = match &expected[0][1..expected[0].len() - 1] {
                     ";" => "semicolon ';'",
                     ")" => "closing parenthesis ')'",
+                    "]" => "closing bracket ']'",
+                    "typeint" => "specifier",
                     _ => expected[0].as_str(),
                 };
                 let mut last = token.0;
                 while last > 0 && (input.as_bytes()[last - 1] == 32 || input.as_bytes()[last - 1] == 9) {
                     last -= 1;
                 }
-                println!("{:?}", token);
-                let lineno = input[..token.0].lines().count() - ((input.as_bytes()[last - 1] == 10) as usize);
+                let lineno = if last != 0 {
+                    input[..token.0].lines().count() - ((input.as_bytes()[last - 1] == 10) as usize)
+                } else {
+                    1
+                };
                 error_str.push((lineno, format!("Error type B at Line {}: Missing {}\n", lineno,
                     expected_str).to_owned()));
             },

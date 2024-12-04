@@ -1,5 +1,5 @@
 int print(int a){
-    while(1){}
+    while(true){}
 }
 int test_12110644_3(){
     print(hello);

@@ -62,6 +62,7 @@ pub enum CompExpr {
     UnaryOperation(UnaryOperator, Box<CompExpr>),
     // Binary Operator can operate on all types of Values.
     BinaryOperation(Box<CompExpr>, BinaryOperator, Box<CompExpr>),
+    Invalid,
     Error
 }
 

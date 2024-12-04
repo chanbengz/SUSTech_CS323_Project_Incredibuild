@@ -1,0 +1,2 @@
+Functions: Function: print:[Body: [While Loop (Condition: true):
+do Body: []]], Functions: Function: test_12110644_3:[Body: [FuncCall: print[hello], FuncCall: print[h: char]]]

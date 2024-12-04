@@ -20,12 +20,22 @@ ProgramPart: tree::ProgramPart = {
 
 // Some useful declarations in the beginning of the program
 pub ParaDecs = Comma<ParaDec>;
-ArgList = Comma<CompExpr>;
-VarDecs = Comma<VarDec>;
+StructDecs = Comma<StructDec>;
 
 Comma<T>: Vec<T> = {
-    <mut v:(<T> ",")*> <e:T?> => match e {
-        None => v,
+    <l:@L> <mut v:(<T> ",")*> <e:T?> <r:@R> => match e {
+        None => {
+            if v.len() != 0 {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, "variable".to_string(), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            }
+            v
+        },
         Some(e) => {
             v.push(e);
             v
@@ -33,13 +43,78 @@ Comma<T>: Vec<T> = {
     }
 };
 
+ArgList: Vec<Box<tree::CompExpr>> = {
+    <l:@L> <mut v:ArgList> "," <e:CompExpr?> <r:@R> => match e {
+        None => {
+            if v.len() != 0 {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, "arguments".to_string(), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            }
+            v
+        },
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    },
+    <e:CompExpr?> => match e {
+        Some(e) => vec![e],
+        None => Vec::new()
+    }
+}
+
+VarDecs: Vec<tree::Variable> = {
+    <l:@L> <mut v:VarDecs> "," <e:VarDec?> <r:@R> => match e {
+        None => {
+            if v.len() != 0 {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, "variable name".to_string(), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            }
+            v
+        },
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    },
+    <e:VarDec?> => match e {
+        Some(e) => vec![e],
+        None => Vec::new()
+    }
+}
+
 ParaDec: tree::Variable = {
-    <spec:Specifier> <name:Identifier> => {
+    <l:@L> <spec:Specifier> <name:Identifier?> <r:@R> => {
+        let name = if let Some(n) = name {
+            n
+        } else {
+            let error = ErrorRecovery {
+                error: ParseError::User {
+                    error: LexicalError::MissingLexeme(l, "variable name".to_string(), r)
+                },
+                dropped_tokens: Vec::new(), // or specify the dropped tokens
+            };
+            errors.push(error);
+            "INVALID".to_string()
+        };
         tree::Variable::FormalParameter(
             Box::new(name),
             Box::new(spec),
             Box::new(Vec::new())
         )
+    },
+    ! => {
+        errors.push(<>); tree::Variable::Error
     }
 }
 
@@ -461,7 +536,7 @@ VarDec: tree::Variable = {
             Box::new(dims)
         )
     },
-    <ident: Identifier> <size: DimDecs?> "=" <val:CompExpr> => {
+    <ident: Identifier> <size: DimDecs?> "=" <l:@L>  <val:CompExpr> <r:@R> => {
         let dims = match size {
             Some(dims) => dims,
             None => Vec::new()
@@ -473,8 +548,6 @@ VarDec: tree::Variable = {
         )
     },
 }
-
-StructDecs = Comma<StructDec>;
 
 StructDec: tree::Variable = {
     "." <ident: Identifier> ":" <val: CompExpr> => {
@@ -795,10 +868,10 @@ Term: Box<tree::CompExpr> = {
                     };
                     errors.push(error);
                 }
+                Box::new(tree::CompExpr::Error) // handled
             },
-            _ => {}
+            _ => Box::new(tree::CompExpr::Error)
         }
-        Box::new(tree::CompExpr::Error)
     },
 }
 
