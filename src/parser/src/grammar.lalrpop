@@ -65,7 +65,16 @@ DimDecs: Vec<tree::CompExpr> = {
 * 4. TODO: macro definition 
 */
 pub Stmt: tree::Statement = {
-    "struct" <name:Identifier> "{" <fields:FieldsDec> "}" ";" => {
+    "struct" <name:Identifier> "{" <fields:FieldsDec> "}" <l:@L> <semicolon:";"?> <r:@R> => {
+        if semicolon == None {
+            let error = ErrorRecovery {
+                error: ParseError::User {
+                    error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
+                },
+                dropped_tokens: Vec::new(), // or specify the dropped tokens
+            };
+            errors.push(error);
+        }
         tree::Statement::Struct(
             tree::Variable::StructDefinition(
                 Box::new(name),
@@ -73,17 +82,28 @@ pub Stmt: tree::Statement = {
             )
         )
     },
-    "include" <name:"string"> ";" => {
+    "include" <name:"string"> => {
         tree::Statement::Include(
             Box::new(name)
         )
     },
-    <global: VarDef> ";"=> {
+    <global: VarDef> <l:@L> <semicolon:";"?> <r:@R> => {
+        if semicolon == None {
+            let error = ErrorRecovery {
+                error: ParseError::User {
+                    error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
+                },
+                dropped_tokens: Vec::new(), // or specify the dropped tokens
+            };
+            errors.push(error);
+        }
         tree::Statement::GlobalVariable(
             global
         )
     },
-
+    ! => {
+        errors.push(<>); tree::Statement::Error
+    },
 }
 
 /*
@@ -106,6 +126,24 @@ FieldsDec: Vec<tree::Variable> = {
         fields.extend(v);
         fields
     },
+    ! => {
+        let error = <>;
+        match &error.error {
+            ParseError::UnrecognizedToken { token, expected } => {
+                if expected.contains(&"\";\"".to_string()) {
+                    let error = ErrorRecovery {
+                        error: ParseError::User {
+                            error: LexicalError::MissingLexeme(token.0, "';'".to_string(), token.2)
+                        },
+                        dropped_tokens: Vec::new(),
+                    };
+                    errors.push(error);
+                }
+            },
+            _ => {}
+        }
+        Vec::new()
+    }
 }
 
 /*
@@ -132,7 +170,6 @@ pub FuncDec: Box<tree::Function> = {
             body
         ))
     },
-    ! => { errors.push(<>); Box::new(tree::Function::Error) },
 }
 
 FuncCall: tree::Expr = {
@@ -169,14 +206,45 @@ Expr: tree::Expr = {
 }
 
 OpenExpr: tree::Expr = {
-    "if" "(" <cond:CondExpr> ")" <body:Expr> => {
+    "if" "(" <cond:CondExpr?> <l:@L> <rb:")"?> <r:@R> <body:Expr> => {
+        if rb == None {
+            let error = ErrorRecovery {
+                error: ParseError::User {
+                    error: LexicalError::MissingLexeme(l, "')'".to_string(), r)
+                },
+                dropped_tokens: Vec::new(),
+            };
+            errors.push(error);
+        }
+        let cond = match cond {
+            Some(cond) => cond,
+            None => {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, "condition".to_string(), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+                Box::new(tree::CondExpr::Bool(false))
+            }
+        };
         let body = match body {
             tree::Expr::Body(body) => body,
             _ => tree::Body::Body(vec![body])
         };
         tree::Expr::If(tree::If::IfExpr(cond, body))
     },
-    "if" "(" <cond:CondExpr> ")" <body:CloseExpr> "else" <body_2:OpenExpr> => {
+    "if" "(" <cond:CondExpr> <l:@L> <rb:")"?> <r:@R> <body:CloseExpr> "else" <body_2:OpenExpr> => {
+        if rb == None {
+            let error = ErrorRecovery {
+                error: ParseError::User {
+                    error: LexicalError::MissingLexeme(l, "')'".to_string(), r)
+                },
+                dropped_tokens: Vec::new(),
+            };
+            errors.push(error);
+        }
         let body = match body {
             tree::Expr::Body(body) => body,
             _ => tree::Body::Body(vec![body])
@@ -245,7 +313,16 @@ CloseExpr: tree::Expr = {
 }
 
 WhileExpr: tree::Expr = {
-    "while" "(" <cond:CondExpr> ")" "{" <body:Body> "}" => {
+    "while" "(" <cond:CondExpr> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> "}" => {
+        if rb == None {
+            let error = ErrorRecovery {
+                error: ParseError::User {
+                    error: LexicalError::MissingLexeme(l, "')'".to_string(), r)
+                },
+                dropped_tokens: Vec::new(),
+            };
+            errors.push(error);
+        }
         tree::Expr::Loop(
             tree::Loop::WhileExpr(
                 cond,
@@ -265,7 +342,7 @@ ForExpr: tree::Expr = {
                 body
             )
         )
-    }
+    },
 }
 
 VarManagement: tree::Expr = {
@@ -478,47 +555,191 @@ pub CompExpr: Box<tree::CompExpr> = {
         Box::new(tree::CompExpr::Error)
     },
 
-    <lhs:CompExpr> "^" <rhs:CompExpr> => {
+    <lhs:CompExpr> <l:@L> <sym:"^"> <r:@R> <rhs:CompExpr> => {
+        match *lhs {
+            tree::CompExpr::Error => {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, format!("Exp before {}", sym), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            },
+            _ => {}
+        }
+        match *rhs {
+            tree::CompExpr::Error => {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, format!("Exp after {}", sym), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            },
+            _ => {}
+        }
         Box::new(tree::CompExpr::BinaryOperation (
             lhs, tree::BinaryOperator::Pow, rhs
         ))
     },
 
-    <lhs:CompExpr> "%" <rhs:CompExpr> => {
+    <lhs:CompExpr> <l:@L> <sym:"%"> <r:@R> <rhs:CompExpr> => {
+        match *lhs {
+            tree::CompExpr::Error => {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, format!("Exp before {}", sym), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            },
+            _ => {}
+        }
+        match *rhs {
+            tree::CompExpr::Error => {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, format!("Exp after {}", sym), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            },
+            _ => {}
+        }
         Box::new(tree::CompExpr::BinaryOperation (
             lhs, tree::BinaryOperator::Mod, rhs
         ))
     },
 
     #[precedence(level="3")] #[assoc(side="left")]
-    <lhs:CompExpr> "*" <rhs:CompExpr> => {
+    <lhs:CompExpr> <l:@L> <sym:"*"> <r:@R> <rhs:CompExpr> => {
+        match *lhs {
+            tree::CompExpr::Error => {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, format!("Exp before {}", sym), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            },
+            _ => {}
+        }
+        match *rhs {
+            tree::CompExpr::Error => {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, format!("Exp after {}", sym), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            },
+            _ => {}
+        }
         Box::new(tree::CompExpr::BinaryOperation (
             lhs, tree::BinaryOperator::Mul, rhs
         ))
     },
 
-    <lhs:CompExpr> "/" <rhs:CompExpr> => {
+    <lhs:CompExpr> <l:@L> <sym:"/"> <r:@R> <rhs:CompExpr> => {
+        match *lhs {
+            tree::CompExpr::Error => {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, format!("Exp before {}", sym), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            },
+            _ => {}
+        }
+        match *rhs {
+            tree::CompExpr::Error => {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, format!("Exp after {}", sym), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            },
+            _ => {}
+        }
         Box::new(tree::CompExpr::BinaryOperation (
             lhs, tree::BinaryOperator::Div, rhs
         ))
     },
 
     #[precedence(level="4")] #[assoc(side="left")]
-    <lhs:CompExpr?> "+" <rhs:CompExpr> => {
+    <lhs:CompExpr?> <l:@L> <sym:"+"> <r:@R> <rhs:CompExpr> => {
         let lhs = match lhs {
              Some(x) => x,
              None => Box::new(tree::CompExpr::Value(tree::Value::Integer(0)))
         };
+        match *lhs {
+            tree::CompExpr::Error => {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, format!("Exp before {}", sym), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            },
+            _ => {}
+        }
+        match *rhs {
+            tree::CompExpr::Error => {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, format!("Exp after {}", sym), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            },
+            _ => {}
+        }
         Box::new(tree::CompExpr::BinaryOperation (
             lhs, tree::BinaryOperator::Add, rhs
         ))
     },
 
-    <lhs:CompExpr?> "-" <rhs:CompExpr> => {
+    <lhs:CompExpr?> <l:@L> <sym:"-"> <r:@R> <rhs:CompExpr> => {
         let lhs = match lhs {
             Some(x) => x,
             None => Box::new(tree::CompExpr::Value(tree::Value::Integer(0)))
         };
+        match *lhs {
+            tree::CompExpr::Error => {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, format!("Exp before {}", sym), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            },
+            _ => {}
+        }
+        match *rhs {
+            tree::CompExpr::Error => {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(l, format!("Exp after {}", sym), r)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            },
+            _ => {}
+        }
         Box::new(tree::CompExpr::BinaryOperation (
             lhs, tree::BinaryOperator::Sub, rhs
         ))
@@ -565,22 +786,15 @@ Term: Box<tree::CompExpr> = {
         let error = <>;
         match &error.error {
             ParseError::UnrecognizedToken { token, expected } => {
-                let error = if expected.contains(&"\")\"".to_string()) {
-                    ErrorRecovery {
+                if expected.contains(&"\")\"".to_string()) {
+                    let error = ErrorRecovery {
                         error: ParseError::User {
                             error: LexicalError::MissingLexeme(token.0, "')'".to_string(), token.2)
                         },
                         dropped_tokens: Vec::new(),
-                    }
-                } else {
-                    ErrorRecovery {
-                        error: ParseError::User {
-                            error: LexicalError::MissingLexeme(token.0, "Exp".to_string(), token.2)
-                        },
-                        dropped_tokens: Vec::new(),
-                    }
-                };
-                errors.push(error);
+                    };
+                    errors.push(error);
+                }
             },
             _ => {}
         }

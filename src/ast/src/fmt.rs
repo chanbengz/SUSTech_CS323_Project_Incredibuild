@@ -26,6 +26,7 @@ impl fmt::Display for Statement {
             Statement::GlobalVariable(vars) => write!(f, "GlobalVariable: [{}]", 
                 vars.iter().map(|var| format!("{}", var)).collect::<Vec<String>>().join(", ")),
             Statement::Struct(structure) => write!(f, "Struct: {}", structure),
+            Statement::Error => write!(f, "[StatementError]"),
         }
     }
 }

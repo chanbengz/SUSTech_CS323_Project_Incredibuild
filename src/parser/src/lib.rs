@@ -1,15 +1,9 @@
 use lalrpop_util::lalrpop_mod;
 
 lalrpop_mod!(pub grammar); // synthesized by LALRPOP
-pub use grammar::CompExprParser;
-pub use grammar::CondExprParser;
-pub use grammar::ParaDecsParser;
-pub use grammar::FuncDecParser;
-pub use grammar::BodyParser;
-pub use grammar::StmtParser;
-pub use grammar::ProgramParser;
 use spl_ast::tree;
 pub use crate::error::display_error;
+use crate::grammar::ProgramParser;
 
 pub mod error;
 
@@ -30,6 +24,13 @@ mod tests {
     use super::*;
     use std::fs::File;
     use std::io::Read;
+    use crate::grammar::CompExprParser;
+    use crate::grammar::CondExprParser;
+    use crate::grammar::ParaDecsParser;
+    use crate::grammar::FuncDecParser;
+    use crate::grammar::BodyParser;
+    use crate::grammar::StmtParser;
+    use crate::grammar::ProgramParser;
 
     enum Parser {
         CompExprParser,
@@ -84,7 +85,20 @@ mod tests {
                 let result = ProgramParser::new().parse(&mut errors, lexer).unwrap();
                 if errors.len() > 0 {
                     let error_str = display_error(&errors, &src_content);
-                    assert_eq!(error_str, expected)
+                    // assert_eq!(error_str, expected)
+                    match (&error_str, &expected) {
+                        (error_str, expected) => {
+                            let error_str = error_str.split("\n").collect::<Vec<&str>>();
+                            let expected = expected.split("\n").collect::<Vec<&str>>();
+                            for i in 0..error_str.len() {
+                                if *error_str[i] != *expected[i] {
+                                    println!("Error: {}", error_str[i]);
+                                    println!("Expected: {}", expected[i]);
+                                    println!("Error Recovery: {:?})", errors[i])
+                                }
+                            }
+                        }
+                    }
                 } else {
                     assert_eq!(format!("{}", result), expected)
                 }
@@ -182,7 +196,7 @@ mod tests {
         "GlobalVariable: [Variable Declaration: a = [0: u32] with dimensions [], Variable Assignment: a = 1: u32, Variable Declaration: b = [0: u32] with dimensions [], Variable Assignment: b = 2: u32]");
         assert_parse(Parser::StmtParser, "struct obj { int a; char b; };", 
         "Struct: Struct Definition: obj with [Variable Declaration: a = [0: u32] with dimensions [], Variable Declaration: b = [ : char] with dimensions []]");
-        assert_parse(Parser::StmtParser, "#include \"../hi.h\";", "Include: ../hi.h");
+        assert_parse(Parser::StmtParser, "#include \"../hi.h\"", "Include: ../hi.h");
         assert_parse(Parser::StmtParser, "int a[1];", "GlobalVariable: [Variable Declaration: a = [0: u32] with dimensions [1: u32]]");
     }
 

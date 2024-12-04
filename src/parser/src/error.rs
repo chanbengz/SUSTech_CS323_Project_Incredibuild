@@ -16,6 +16,7 @@ pub fn display_error(errors: &Vec<ErrorRecovery<usize, Token, LexicalError>>, in
                 while last > 0 && (input.as_bytes()[last - 1] == 32 || input.as_bytes()[last - 1] == 9) {
                     last -= 1;
                 }
+                println!("{:?}", token);
                 let lineno = input[..token.0].lines().count() - ((input.as_bytes()[last - 1] == 10) as usize);
                 error_str.push((lineno, format!("Error type B at Line {}: Missing {}\n", lineno,
                     expected_str).to_owned()));
@@ -30,7 +31,6 @@ pub fn display_error(errors: &Vec<ErrorRecovery<usize, Token, LexicalError>>, in
                         let expected_str = match token.as_str() {
                             "';'" => format!("semicolon {}", token),
                             "')'" => format!("closing parenthesis {}", token),
-                            "Exp" => format!("{} after {}", token, input[last-1..last].to_owned()),
                             _ => token.to_owned(),
                         };
                         let lineno = input[..*r].lines().count() - ((input.as_bytes()[last - 1] == 10) as usize);

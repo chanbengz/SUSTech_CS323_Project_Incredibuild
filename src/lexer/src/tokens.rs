@@ -15,7 +15,7 @@
 */
 
 use logos::{Logos, FilterResult};
-use std::fmt; 
+use std::fmt;
 use std::num::ParseIntError;
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -177,7 +177,7 @@ pub enum Token {
     BlockComment,
 
     // error handling
-    #[regex(r"(0|[1-9][0-9]*)[a-zA-Z_][a-zA-Z0-9_]*")]
+    #[regex(r"((0|[1-9][0-9]*)[a-zA-Z_][a-zA-Z0-9_]*)|(0[0-9]+(\.[0-9]+)?)")]
     Invalid,
     Error
 }
@@ -259,7 +259,27 @@ fn process_block_comment(lex: &mut logos::Lexer<Token>) -> FilterResult<(), Lexi
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-      write!(f, "{:?}", self)
+        match self {
+            Token::OpGreaterThan => write!(f, ">"),
+            Token::OpLessThan => write!(f, "<"),
+            Token::OpLessThanEqual => write!(f, "<="),
+            Token::OpGreaterThanEqual => write!(f, ">="),
+            Token::OpEqual => write!(f, "=="),
+            Token::OpNotEqual => write!(f, "!="),
+            Token::OpAssign => write!(f, "="),
+            Token::OpPlus => write!(f, "+"),
+            Token::OpMinus => write!(f, "-"),
+            Token::OpMul => write!(f, "*"),
+            Token::OpDiv => write!(f, "/"),
+            Token::OpMod => write!(f, "%"),
+            Token::OpPow => write!(f, "^"),
+            Token::OpAnd => write!(f, "&&"),
+            Token::OpOr => write!(f, "||"),
+            Token::OpNot => write!(f, "!"),
+            Token::OpIncrement => write!(f, "++"),
+            Token::OpDecrement => write!(f, "--"),
+            _ => write!(f, "{:?}", self)
+        }
     }
 }
 

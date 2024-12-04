@@ -9,7 +9,7 @@ pub use std::fs::File;
 
 #[cfg(test)]
 mod test {
-    use crate::tokens::{LexicalError, Token};
+    use crate::tokens::{Token};
     use crate::tokens::Token::*;
     use logos::Logos;
     use std::fs::File;

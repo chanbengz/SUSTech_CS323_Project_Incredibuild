@@ -17,6 +17,7 @@ pub enum Statement {
     Include(Box<String>), 
     GlobalVariable(Vec<Variable>),
     Struct(Variable),
+    Error
 }
 
 #[derive(Clone, Debug, PartialEq)]
