@@ -29,16 +29,12 @@ pub fn display_error(errors: &Vec<ErrorRecovery<usize, Token, LexicalError>>, in
             lalrpop_util::ParseError::User { error } => {
                 match error {
                     LexicalError::MissingLexeme(l, token, r) => {
-                        let mut last = *l;
-                        while last > 0 && (input.as_bytes()[last - 1] == 32 || input.as_bytes()[last - 1] == 9) {
-                            last -= 1;
-                        }
                         let expected_str = match token.as_str() {
                             "';'" => format!("semicolon {}", token),
                             "')'" => format!("closing parenthesis {}", token),
                             _ => token.to_owned(),
                         };
-                        let lineno = input[..*r].lines().count() - ((input.as_bytes()[last - 1] == 10) as usize);
+                        let lineno = input[..*l].lines().count();
                         error_str.push((lineno, format!("Error type B at Line {}: Missing {}\n",
                                                          lineno, expected_str).to_owned()));
                     },

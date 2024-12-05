@@ -23,7 +23,7 @@ pub ParaDecs = Comma<ParaDec>;
 StructDecs = Comma<StructDec>;
 
 Comma<T>: Vec<T> = {
-    <l:@L> <mut v:(<T> ",")*> <e:T?> <r:@R> => match e {
+    <l:@L> <mut v:Comma<T>> "," <e:T?> <r:@R> => match e {
         None => {
             if v.len() != 0 {
                 let error = ErrorRecovery {
@@ -40,6 +40,10 @@ Comma<T>: Vec<T> = {
             v.push(e);
             v
         }
+    },
+    <e:T?> => match e {
+        Some(e) => vec![e],
+        None => Vec::new()
     }
 };
 
@@ -185,8 +189,8 @@ pub Stmt: tree::Statement = {
 * Fields declaration: Used in struct definition 
 */
 FieldsDec: Vec<tree::Variable> = {
-    <field:VarDef> <l:@L> <comma:";"?> <r:@R> => {
-        if comma == None {
+    <field:VarDef> <l:@L> <semicolon:";"?> <r:@R> => {
+        if semicolon == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
                     error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
@@ -197,28 +201,19 @@ FieldsDec: Vec<tree::Variable> = {
         }
         field
     },
-    <mut fields:FieldsDec> <v:VarDef> ";" => {
+    <mut fields:FieldsDec> <v:VarDef> <l:@L> <semicolon:";"?> <r:@R> => {
+        if semicolon == None {
+            let error = ErrorRecovery {
+                error: ParseError::User {
+                    error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
+                },
+                dropped_tokens: Vec::new(), // or specify the dropped tokens
+            };
+            errors.push(error);
+        }
         fields.extend(v);
         fields
     },
-    ! => {
-        let error = <>;
-        match &error.error {
-            ParseError::UnrecognizedToken { token, expected } => {
-                if expected.contains(&"\";\"".to_string()) {
-                    let error = ErrorRecovery {
-                        error: ParseError::User {
-                            error: LexicalError::MissingLexeme(token.0, "';'".to_string(), token.2)
-                        },
-                        dropped_tokens: Vec::new(),
-                    };
-                    errors.push(error);
-                }
-            },
-            _ => {}
-        }
-        Vec::new()
-    }
 }
 
 /*
@@ -367,24 +362,48 @@ CloseExpr: tree::Expr = {
         Some(val) => tree::Expr::Return(*val)
     },
     "{" <expr:Body> "}" => tree::Expr::Body(expr),
-    ! => {
-        let error = <>;
-        match &error.error {
-            ParseError::UnrecognizedToken { token, expected } => {
-                if expected.contains(&"\";\"".to_string()) {
-                    let error = ErrorRecovery {
-                        error: ParseError::User {
-                            error: LexicalError::MissingLexeme(token.0, "';'".to_string(), token.2)
-                        },
-                        dropped_tokens: Vec::new(),
-                    };
-                    errors.push(error);
-                }
+
+    // Error handling
+    <expr:VarManagement> <l:@L> <missing:!> <r:@R> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
             },
-            _ => {}
-        }
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
         tree::Expr::Error
-    }
+    },
+    <expr:"break"> <l:@L> <missing:!> <r:@R> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        tree::Expr::Error
+    },
+    <expr:"continue"> <l:@L> <missing:!> <r:@R> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        tree::Expr::Error
+    },
+    <expr:"return"> <val:CompExpr?> <l:@L> <missing:!> <r:@R> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        tree::Expr::Error
+    },
 }
 
 WhileExpr: tree::Expr = {
