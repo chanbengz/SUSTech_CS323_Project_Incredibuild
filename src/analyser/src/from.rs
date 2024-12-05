@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use spl_ast::tree::{Value, Variable, CompExpr};
 use crate::manager::SymbolManager;
 use crate::symbol::*;
@@ -28,25 +30,3 @@ impl From<Val> for BasicType {
         }
     }
 }
-
-// When conducting From methods, check whether the symbol is already in the scope table.
-impl From<(&mut SymbolManager, Variable)> for VarSymbol {
-    fn from(input: (&mut SymbolManager, Variable)) -> VarSymbol {
-        let mut manager = input.0;
-        let variable = input.1;
-        match variable {
-            Variable::VarDeclaration(identifier, value, dimensions) => {
-                let val = Val::from(*value);
-                let dim = dimensions.iter().map(|d| {
-                    match d {
-                        CompExpr::Value(Value::Integer(i)) => *i as usize,
-                        _ => 0
-                    }
-                }).collect();
-                manager.new_var_symbol(identifier, val, is_global)
-            },
-            _ => panic!("Invalid Variable Type")
-        }
-    }
-}
-

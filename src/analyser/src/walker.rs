@@ -1,13 +1,17 @@
+use std::thread::Scope;
+
 use spl_ast::tree::*;
 use crate::manager::SymbolManager;
 use crate::error::SemanticError;
 use crate::symbol::*;
+use crate::stack::ScopeStack;
 
 pub struct Walker {
     pub program: Program,
     pub manager: SymbolManager,
     pub errors: Vec<SemanticError>,
     pub vecs: Vec<VarSymbol>,
+    pub symbol_tables: ScopeStack,
 }
 
 impl Walker {
@@ -17,6 +21,7 @@ impl Walker {
             manager,
             errors: Vec::new(),
             vecs: Vec::new(),
+            symbol_tables: ScopeStack::new()
         }
     }
 
@@ -70,6 +75,7 @@ impl Walker {
                 println!("Struct");
                 self.traverse_variable(var);
             }
+            Statement::Error => println!("Error in Statements.")
         }
     }
 
@@ -79,8 +85,46 @@ impl Walker {
                 println!("VarReference: {:?}, Dimensions: {:?}", name, dimensions);
             }
             Variable::VarDeclaration(name, values, dimensions) => {
-                self.vecs.push(VarSymbol::from((&mut self.manager, Variable::VarDeclaration(name.clone(), values.clone(), dimensions.clone()))));
                 println!("VarDeclaration: {:?}, Values: {:?}, Dimensions: {:?}", name, values, dimensions);
+                let val = Val::from(*values.clone());
+                // Validate all dimensions and collect them
+                let mut dim = Vec::new();
+                for comp_expr in *dimensions.clone() {
+                    match comp_expr {
+                        CompExpr::Value(value) => match value {
+                            Value::Integer(i) => dim.push(i as usize),
+                            _ => {
+                                // Return an error if any dimension is not an integer
+                                self.errors.push(SemanticError::TypeError {
+                                    id: 18,
+                                    message: "Reference for array does not conform to Int type.".to_owned(),
+                                    line: 0
+                                });
+                            }
+                        },
+                        _ => {
+                            // Return an error for invalid dimension types
+                            self.errors.push(SemanticError::TypeError {
+                                id: 18,
+                                message: "Reference for array does not conform to Int type.".to_owned(),
+                                line: 0
+                            });
+                        }
+                    }
+                }
+                let new_symbol = self.manager.new_var_symbol(
+                    *name.clone(), 
+                    VarType::Primitive((BasicType::from(val.clone()), val)), 
+                    true
+                );
+                match self.symbol_tables.define_var_symbol(new_symbol) {
+                    Ok(()) => {
+                        println!("Variable symbol defined successfully");
+                    }
+                    Err(err) => {
+                        self.errors.push(err)
+                    }
+                }
             }
             Variable::VarAssignment(name, value, dimensions) => {
                 println!("VarAssignment: {:?}, Value: {:?}, Dimensions: {:?}", name, value, dimensions);
@@ -247,7 +291,8 @@ impl Walker {
                 self.traverse_comp_expr(lhs);
                 self.traverse_comp_expr(rhs);
             }
-            CompExpr::Error => println!("Error in Computation Expression"),
+            CompExpr::Error => println!("Error in Computation Expression."),
+            CompExpr::Invalid => println!("Invlaid Computation Expression.")
         }
     }
 
