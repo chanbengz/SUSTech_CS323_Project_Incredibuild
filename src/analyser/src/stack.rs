@@ -4,9 +4,10 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use crate::error::SemanticError;
 
+#[derive(Clone, Debug)]
 pub struct ScopeStack {
-    func_scope: Rc<RefCell<ScopeTable<FuncSymbol>>>,
-    stack: Vec<Rc<RefCell<ScopeTable<VarSymbol>>>>,
+    pub func_scope: Rc<RefCell<ScopeTable<FuncSymbol>>>,
+    pub stack: Vec<Rc<RefCell<ScopeTable<VarSymbol>>>>,
     depth: usize,
 }
 

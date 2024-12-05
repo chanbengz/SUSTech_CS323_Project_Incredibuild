@@ -2,7 +2,7 @@ use thiserror::Error;
 
 pub use SemanticError::*;
 
-#[derive(Error, Debug)]
+#[derive(Clone, Error, Debug)]
 pub enum SemanticError {
 	#[error("[Semantic Error] Type Mismatch Error[{id:?}] at line {line:?}: {message:?}")]
 	TypeError{
