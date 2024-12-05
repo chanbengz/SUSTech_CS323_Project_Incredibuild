@@ -1,4 +1,6 @@
-use lalrpop_util::lalrpop_mod;
+use std::fs::File;
+use lalrpop_util::{lalrpop_mod, ErrorRecovery};
+use spl_lexer::tokens::{Token, LexicalError};
 
 lalrpop_mod!(pub grammar); // synthesized by LALRPOP
 use spl_ast::tree;
@@ -6,16 +8,33 @@ pub use crate::error::display_error;
 use crate::grammar::ProgramParser;
 
 pub mod error;
+use std::io::Read;
 
-pub fn parse(source: &str) -> Result<tree::Program, String> {
+pub fn parse(source: &str) -> Result<tree::Program, Vec<ErrorRecovery<usize, Token, LexicalError>>> {
     let mut errors = Vec::new();
     let lexer = spl_lexer::lexer::Lexer::new(&source);
     let result = ProgramParser::new().parse(&mut errors, lexer).unwrap();
     if errors.len() > 0 {
-        display_error(&errors, &source);
-        Err(format!("Syntax Error: {}", errors.len()))
+        Err(errors.to_owned())
     } else {
         Ok(result)
+    }
+}
+
+pub fn parse_from_file(source_path: &str) -> Result<tree::Program, String> {
+    let mut source = String::new();
+    File::open(source_path)
+        .expect("File not found")
+        .read_to_string(&mut source)
+        .expect("Failed to read file");
+
+    let result = parse(&source);
+    match result {
+        Ok(ast) => Ok(ast),
+        Err(errors) => {
+            display_error(&errors, &source, source_path);
+            Err(format!("\n{} syntax error(s) found", errors.len()))
+        }
     }
 }
 

@@ -8,6 +8,7 @@ license = "GPL-3.0"
 spl_lexer = {version = "0.0.1", path = "../lexer"}
 spl_ast = {version = "0.0.1", path = "../ast"}
 lalrpop-util = { version = "0.21.0", features = ["unicode"] }
+colored = "2"
 
 [build-dependencies]
 lalrpop = { version = "0.22.0", default-features = false }

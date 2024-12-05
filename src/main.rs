@@ -1,9 +1,7 @@
 extern crate llvm_ir as llvm;
 
-use std::fs::File;
-use std::io::Read;
-use spl_parser::parse;
-use clap::{arg, Arg, Command};
+use spl_parser::{parse_from_file};
+use clap::{Arg, Command};
 // use std::ffi::CString;
 // use std::ptr;
 
@@ -17,16 +15,16 @@ fn main() {
             Arg::new("output").short('o').long("output").required(false)
         )
         .get_matches();
-    let mut input = String::new();
-    File::open(args.get_one::<String>("input").unwrap())
-        .unwrap().read_to_string(&mut input)
-        .expect(format!("error: could not read file {}",
-            args.get_one::<String>("input").unwrap()).as_str()
-        );
 
+    let source_path = args.get_one::<String>("input").unwrap();
 
-    let parsed_input = parse(&input).unwrap();
-    println!("{:?}", parsed_input);
+    let parsed_input = parse_from_file(&source_path);
+    match parsed_input {
+        Ok(_) => println!("[32mParsed successfully[0m"),
+        Err(e) => {
+            println!("{}", e);
+        }
+    }
 
     // unsafe {
     //     codegen(parsed_input);
