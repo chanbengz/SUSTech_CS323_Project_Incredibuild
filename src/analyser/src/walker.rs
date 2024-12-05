@@ -10,7 +10,6 @@ pub struct Walker {
     pub program: Program,
     pub manager: SymbolManager,
     pub errors: Vec<SemanticError>,
-    pub vecs: Vec<VarSymbol>,
     pub symbol_tables: ScopeStack,
 }
 
@@ -20,13 +19,16 @@ impl Walker {
             program,
             manager,
             errors: Vec::new(),
-            vecs: Vec::new(),
             symbol_tables: ScopeStack::new()
         }
     }
 
-    pub fn get_symbols(&self) -> Vec<VarSymbol> {
-        self.vecs.clone()
+    pub fn get_tables(&self) -> ScopeStack {
+        self.symbol_tables.clone()
+    }
+
+    pub fn get_errors(&self) -> Vec<SemanticError> {
+        self.errors.clone()
     }
 
     pub fn traverse(&mut self) {
@@ -86,7 +88,6 @@ impl Walker {
             }
             Variable::VarDeclaration(name, values, dimensions) => {
                 println!("VarDeclaration: {:?}, Values: {:?}, Dimensions: {:?}", name, values, dimensions);
-                let val = Val::from(*values.clone());
                 // Validate all dimensions and collect them
                 let mut dim = Vec::new();
                 for comp_expr in *dimensions.clone() {
@@ -114,7 +115,7 @@ impl Walker {
                 }
                 let new_symbol = self.manager.new_var_symbol(
                     *name.clone(), 
-                    VarType::Primitive((BasicType::from(val.clone()), val)), 
+                    VarType::Primitive(BasicType::from(*values.clone())), 
                     true
                 );
                 match self.symbol_tables.define_var_symbol(new_symbol) {
@@ -128,6 +129,14 @@ impl Walker {
             }
             Variable::VarAssignment(name, value, dimensions) => {
                 println!("VarAssignment: {:?}, Value: {:?}, Dimensions: {:?}", name, value, dimensions);
+                match self.symbol_tables.get_var_symbol(name) {
+                    Ok(symbol) => {
+                        
+                    }
+                    Err(err) => {
+                        self.errors.push(err)
+                    }
+                }
             }
             Variable::StructReference(name) => println!("StructReference: {:?}", name),
             Variable::StructDefinition(name, variables) => {
@@ -173,9 +182,16 @@ impl Walker {
         match body {
             Body::Body(exprs) => {
                 println!("Body");
+                self.symbol_tables.extend_scope();
                 for expr in exprs {
                     self.traverse_expr(expr);
                 }
+                // match self.symbol_tables.exit_scope() {
+                //     Ok(()) => {}
+                //     Err(err) => {
+                //         self.errors.push(err)
+                //     }
+                // }
             }
             Body::Error => println!("Error in Body"),
         }

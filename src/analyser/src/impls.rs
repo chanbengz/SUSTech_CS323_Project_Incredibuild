@@ -1,5 +1,6 @@
 use crate::symbol::*;
 use crate::manager::SymbolManager;
+use crate::error::{SemanticError, SemanticErrorManager};
 
 impl<T> Symbol<T> {
     pub fn new(id: i32, is_global: bool, identifier: String, symbol_type: T) -> Symbol<T>{
@@ -15,51 +16,39 @@ impl<T> Symbol<T> {
 
 // From for VarSymbol
 impl VarSymbol {
-    pub fn primitive(manager: &mut SymbolManager, identifier: String, type_t: BasicType, value: Val, is_global: bool) -> VarSymbol {
-        manager.new_var_symbol(identifier, VarType::Primitive((type_t, value)), is_global)
+    pub fn primitive(manager: &mut SymbolManager, identifier: String, type_t: BasicType, is_global: bool) -> VarSymbol {
+        manager.new_var_symbol(identifier, VarType::Primitive(type_t), is_global)
     }
     
-    pub fn array(manager: &mut SymbolManager, identifier: String, type_t: BasicType, value: Vec<Val>, dimensions: Vec<usize>, is_global: bool) -> VarSymbol {
-        manager.new_var_symbol(identifier, VarType::Array((type_t, value, dimensions)), is_global)
+    pub fn array(manager: &mut SymbolManager, identifier: String, type_t: BasicType, dimensions: Vec<usize>, is_global: bool) -> VarSymbol {
+        manager.new_var_symbol(identifier, VarType::Array((type_t, dimensions)), is_global)
     }
 
     pub fn struct_type(manager: &mut SymbolManager, identifier: String, fields: (Vec<String>, Vec<VarType>), is_global: bool) -> VarSymbol {
         manager.new_var_symbol(identifier, VarType::Struct(fields), is_global)
     }
 
-    pub fn get_primitive(&self) -> Option<(BasicType, Val)> {
+    pub fn get_primitive(&self) -> Option<BasicType> {
         match &self.symbol_type {
-            VarType::Primitive((t, v)) => Some((*t, v.clone())),
+            VarType::Primitive(t) => Some(*t),
             _ => None,
         }
     }
 
     pub fn get_array_dimensions(&self) -> Option<Vec<usize>> {
         match &self.symbol_type {
-            VarType::Array((_, _, d)) => Some(d.clone()),
+            VarType::Array((_, d)) => Some(d.clone()),
             _ => None,
         }
     }
 
-    pub fn get_array_value(&self, index: Vec<usize>) -> Option<Val> {
-        let mut index_value: usize = 0;
-        let dimensions = self.get_array_dimensions().unwrap();
-        for i in 0..index.len() {
-            index_value += index[i] * dimensions[i];
-        }
-        match &self.symbol_type {
-            VarType::Array((_, v, _)) => Some(v[index_value].clone()),
-            _ => None,
-        }
-    }
-
-    pub fn get_struct_field(&self, field: String) -> Option<(BasicType, Val)> {
+    pub fn get_struct_field(&self, field: String) -> Option<BasicType> {
         match &self.symbol_type {
             VarType::Struct((fields, types)) => {
                 for i in 0..fields.len() {
                     if fields[i] == field {
                         return match &types[i] {
-                            VarType::Primitive((t, v)) => Some((*t, v.clone())),
+                            VarType::Primitive(t) => Some(*t),
                             _ => None,
                         }
                     }
@@ -68,7 +57,7 @@ impl VarSymbol {
             },
             _ => None,
         }
-    }
+    } 
 }
 
 // From for FuncSymbol

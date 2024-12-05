@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 // Define the HashMap structure
+#[derive(Clone, Debug)]
 pub struct ScopeTable<T>
 {
     pub symbols: HashMap<String, T>

@@ -3,6 +3,7 @@ use std::fmt::Display;
 use crate::symbol::{FuncSymbol, Symbol, VarSymbol, FuncType, VarType};
 use spl_ast::tree::Variable;
 use spl_ast::tree::Function;
+use crate::error::SemanticError;
 
 
 #[derive(Default)]

@@ -31,8 +31,8 @@ pub enum VarType {
 	Struct(StructType)
 }
 
-pub type PrimType = (BasicType, Val);
-pub type ArrayType = (BasicType, Vec<Val>, Vec<usize>);
+pub type PrimType = (BasicType);
+pub type ArrayType = (BasicType, Vec<usize>);
 pub type StructType = (Vec<String>, Vec<VarType>);
 pub type FuncType = (FuncReturnType, Vec<VarType>);
 
@@ -55,14 +55,4 @@ pub enum FuncReturnType {
 	String,
 	#[default]
 	Void
-}
-
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub enum Val {
-	Int(i32),
-	Char(char),
-	Float(f32),
-	Bool(bool),
-	String(String),
-	Array(ArrayType)
 }
