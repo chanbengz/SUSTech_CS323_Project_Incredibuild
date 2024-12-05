@@ -21,9 +21,9 @@ pub fn parse(source: &str) -> Result<tree::Program, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::fs::File;
     use std::io::Read;
+    use crate::error::format_errors;
     use crate::grammar::CompExprParser;
     use crate::grammar::CondExprParser;
     use crate::grammar::ParaDecsParser;
@@ -84,7 +84,7 @@ mod tests {
             Parser::ProgramParser => {
                 let result = ProgramParser::new().parse(&mut errors, lexer).unwrap();
                 if errors.len() > 0 {
-                    let error_str = display_error(&errors, &src_content);
+                    let error_str = format_errors(&errors, &src_content);
                     // assert_eq!(error_str, expected)
                     match (&error_str, &expected) {
                         (error_str, expected) => {
@@ -92,9 +92,10 @@ mod tests {
                             let expected = expected.split("\n").collect::<Vec<&str>>();
                             for i in 0..error_str.len() {
                                 if *error_str[i] != *expected[i] {
-                                    println!("Error: {}", error_str[i]);
+                                    println!("Error:    {}", error_str[i]);
                                     println!("Expected: {}", expected[i]);
-                                    println!("Error Recovery: {:?})", errors[i])
+                                    println!("Error Recovery: {:?})", errors[i]);
+                                    assert_eq!(error_str[i], expected[i]);
                                 }
                             }
                         }

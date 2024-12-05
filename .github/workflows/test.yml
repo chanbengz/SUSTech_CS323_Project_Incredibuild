@@ -29,4 +29,4 @@ jobs:
 
     - name: Test Analyzer
       run: cargo test --verbose
-      working-directory: src/analyzer
+      working-directory: src/analyser

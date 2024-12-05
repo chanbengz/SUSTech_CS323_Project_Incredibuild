@@ -1,16 +1,32 @@
 extern crate llvm_ir as llvm;
 
+use std::fs::File;
+use std::io::Read;
+use spl_parser::parse;
+use clap::{arg, Arg, Command};
 // use std::ffi::CString;
-// use std::fs::File;
-// use std::io::Read;
 // use std::ptr;
 
 fn main() {
-    // let mut input = String::new();
-    // let mut f = File::open("in.ex").unwrap();
-    // f.read_to_string(&mut input).unwrap();
+    let args = Command::new("Incredibuild")
+        .about("Compile SPL code to executable")
+        .arg(
+            Arg::new("input").index(1).required(true)
+        )
+        .arg(
+            Arg::new("output").short('o').long("output").required(false)
+        )
+        .get_matches();
+    let mut input = String::new();
+    File::open(args.get_one::<String>("input").unwrap())
+        .unwrap().read_to_string(&mut input)
+        .expect(format!("error: could not read file {}",
+            args.get_one::<String>("input").unwrap()).as_str()
+        );
 
-    // let parsed_input = parser::program(&input).unwrap();
+
+    let parsed_input = parse(&input).unwrap();
+    println!("{:?}", parsed_input);
 
     // unsafe {
     //     codegen(parsed_input);

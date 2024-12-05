@@ -98,6 +98,16 @@ VarDecs: Vec<tree::Variable> = {
 }
 
 ParaDec: tree::Variable = {
+    <l:@L> <missing:!> <name:Identifier?> <r:@R> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(l, "specifier".to_string(), r)
+            },
+            dropped_tokens: Vec::new(), // or specify the dropped tokens
+        };
+        errors.push(error);
+        tree::Variable::Error
+    },
     <l:@L> <spec:Specifier> <name:Identifier?> <r:@R> => {
         let name = if let Some(n) = name {
             n
@@ -117,12 +127,19 @@ ParaDec: tree::Variable = {
             Box::new(Vec::new())
         )
     },
-    ! => {
-        errors.push(<>); tree::Variable::Error
-    }
 }
 
 DimDecs: Vec<tree::CompExpr> = {
+    "[" CompExpr <l:@L> <missing:!> <r:@R> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(l, "closing bracket ']'".to_string(), r)
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        Vec::new()
+    },
     "[" <n:CompExpr> "]" => {
         let mut v = Vec::new();
         v.push(*n);
@@ -148,7 +165,7 @@ pub Stmt: tree::Statement = {
         if semicolon == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
-                    error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
+                    error: LexicalError::MissingLexeme(l, "semicolon ';'".to_string(), r)
                 },
                 dropped_tokens: Vec::new(), // or specify the dropped tokens
             };
@@ -170,7 +187,7 @@ pub Stmt: tree::Statement = {
         if semicolon == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
-                    error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
+                    error: LexicalError::MissingLexeme(l, "semicolon ';'".to_string(), r)
                 },
                 dropped_tokens: Vec::new(), // or specify the dropped tokens
             };
@@ -180,9 +197,16 @@ pub Stmt: tree::Statement = {
             global
         )
     },
-    ! => {
-        errors.push(<>); tree::Statement::Error
-    },
+    <l:@L> <missing:!> <r:@R> ";" => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(l, "specifier".to_string(), r)
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        tree::Statement::Error
+    }
 }
 
 /*
@@ -193,7 +217,7 @@ FieldsDec: Vec<tree::Variable> = {
         if semicolon == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
-                    error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
+                    error: LexicalError::MissingLexeme(l, "semicolon ';'".to_string(), r)
                 },
                 dropped_tokens: Vec::new(), // or specify the dropped tokens
             };
@@ -205,7 +229,7 @@ FieldsDec: Vec<tree::Variable> = {
         if semicolon == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
-                    error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
+                    error: LexicalError::MissingLexeme(l, "semicolon ';'".to_string(), r)
                 },
                 dropped_tokens: Vec::new(), // or specify the dropped tokens
             };
@@ -223,11 +247,11 @@ FieldsDec: Vec<tree::Variable> = {
 * 3. Body: { Expr* }
 */
 pub FuncDec: Box<tree::Function> = {
-    <ret: Specifier> <name:Identifier> <l:@L> <lb:"("> <params:ParaDecs> <rb:")"?> <r:@R> "{" <body:Body> "}" => {
+    <ret: Specifier> <name:Identifier> <lb:"("> <params:ParaDecs> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> "}" => {
         if rb == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
-                    error: LexicalError::MissingLexeme(l, "')'".to_string(), r)
+                    error: LexicalError::MissingLexeme(l, "closing parenthesis ')'".to_string(), r)
                 },
                 dropped_tokens: Vec::new(), // or specify the dropped tokens
             };
@@ -280,7 +304,7 @@ OpenExpr: tree::Expr = {
         if rb == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
-                    error: LexicalError::MissingLexeme(l, "')'".to_string(), r)
+                    error: LexicalError::MissingLexeme(l, "closing parenthesis ')'".to_string(), r)
                 },
                 dropped_tokens: Vec::new(),
             };
@@ -309,7 +333,7 @@ OpenExpr: tree::Expr = {
         if rb == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
-                    error: LexicalError::MissingLexeme(l, "')'".to_string(), r)
+                    error: LexicalError::MissingLexeme(l, "closing parenthesis ')'".to_string(), r)
                 },
                 dropped_tokens: Vec::new(),
             };
@@ -367,7 +391,7 @@ CloseExpr: tree::Expr = {
     <expr:VarManagement> <l:@L> <missing:!> <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
-                error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
+                error: LexicalError::MissingLexeme(l, "semicolon ';'".to_string(), r)
             },
             dropped_tokens: Vec::new(),
         };
@@ -377,7 +401,7 @@ CloseExpr: tree::Expr = {
     <expr:"break"> <l:@L> <missing:!> <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
-                error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
+                error: LexicalError::MissingLexeme(l, "semicolon ';'".to_string(), r)
             },
             dropped_tokens: Vec::new(),
         };
@@ -387,7 +411,7 @@ CloseExpr: tree::Expr = {
     <expr:"continue"> <l:@L> <missing:!> <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
-                error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
+                error: LexicalError::MissingLexeme(l, "semicolon ';'".to_string(), r)
             },
             dropped_tokens: Vec::new(),
         };
@@ -397,7 +421,7 @@ CloseExpr: tree::Expr = {
     <expr:"return"> <val:CompExpr?> <l:@L> <missing:!> <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
-                error: LexicalError::MissingLexeme(l, "';'".to_string(), r)
+                error: LexicalError::MissingLexeme(l, "semicolon ';'".to_string(), r)
             },
             dropped_tokens: Vec::new(),
         };
@@ -411,7 +435,7 @@ WhileExpr: tree::Expr = {
         if rb == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
-                    error: LexicalError::MissingLexeme(l, "')'".to_string(), r)
+                    error: LexicalError::MissingLexeme(l, "closing parenthesis ')'".to_string(), r)
                 },
                 dropped_tokens: Vec::new(),
             };
@@ -458,11 +482,21 @@ VarManagement: tree::Expr = {
             vec![def]
         )
     },
-    <obj: Identifier> "." <field: Identifier> "=" <val:CompExpr> => {
+    <obj: Identifier> "." <l:@L> <field: Identifier?> <r:@R> "=" <val:CompExpr> => {
+        if field == None {
+            let error = ErrorRecovery {
+                error: ParseError::User {
+                    error: LexicalError::MissingLexeme(l, "field name".to_string(), r)
+                },
+                dropped_tokens: Vec::new(),
+            };
+            errors.push(error);
+            return tree::Expr::Error;
+        }
         tree::Expr::VarManagement(
             vec![tree::Variable::StructAssignment(
-                Box::new(obj.clone()),
-                Box::new(field.clone()),
+                Box::new(obj),
+                Box::new(field.unwrap()),
                 val
             )]
         )
@@ -536,7 +570,7 @@ VarDef: Vec<tree::Variable> = {
             }
         });
         variables
-    }
+    },
 }
 
 // Variable Declaration
@@ -618,7 +652,7 @@ pub CondExpr: Box<tree::CondExpr> = {
             lhs, tree::JudgeOperator::NE, rhs
         ))
     },
-#[precedence(level="3")] #[assoc(side="left")] 
+#[precedence(level="3")] #[assoc(side="left")]
     <lhs:CondExpr> "&&" <rhs:CondExpr> => {
         Box::new(tree::CondExpr::BinaryCondition(
             lhs, tree::BinaryOperator::And, rhs
@@ -874,9 +908,21 @@ Term: Box<tree::CompExpr> = {
         errors.push(error);
         Box::new(tree::CompExpr::Error)
     },
-    ! => {
-        Box::new(tree::CompExpr::Error)
-    },
+    <error:!> => match &error.error {
+        ParseError::UnrecognizedToken { token, expected } => {
+            if expected.contains(&"\")\"".to_string()) {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::MissingLexeme(token.0, "closing parenthesis ')'".to_string(), token.2)
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            }
+            Box::new(tree::CompExpr::Error)
+        },
+        _ => Box::new(tree::CompExpr::Error)
+     }
 }
 
 CondTerm: Box<tree::CondExpr> = {
