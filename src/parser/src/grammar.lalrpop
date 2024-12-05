@@ -875,22 +875,7 @@ Term: Box<tree::CompExpr> = {
         Box::new(tree::CompExpr::Error)
     },
     ! => {
-        let error = <>;
-        match &error.error {
-            ParseError::UnrecognizedToken { token, expected } => {
-                if expected.contains(&"\")\"".to_string()) {
-                    let error = ErrorRecovery {
-                        error: ParseError::User {
-                            error: LexicalError::MissingLexeme(token.0, "')'".to_string(), token.2)
-                        },
-                        dropped_tokens: Vec::new(),
-                    };
-                    errors.push(error);
-                }
-                Box::new(tree::CompExpr::Error) // handled
-            },
-            _ => Box::new(tree::CompExpr::Error)
-        }
+        Box::new(tree::CompExpr::Error)
     },
 }
 
