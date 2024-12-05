@@ -163,6 +163,10 @@ impl Walker {
                 println!("Return");
                 self.traverse_comp_expr(comp_expr);
             }
+            Expr::Body(body) => {
+                println!("Body");
+                self.traverse_body(body);
+            }
             Expr::Error => println!("Error in Expression"),
         }
     }

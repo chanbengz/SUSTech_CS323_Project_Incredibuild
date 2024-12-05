@@ -35,19 +35,15 @@ impl From<(&mut SymbolManager, Variable)> for VarSymbol {
         let mut manager = input.0;
         let variable = input.1;
         match variable {
-            Variable::VarDeclaration(identifier, values, dimensions) => {
-                let val: Vec<Val> = values.iter().map(|v| Val::from(v.clone())).collect();
+            Variable::VarDeclaration(identifier, value, dimensions) => {
+                let val = Val::from(*value);
                 let dim = dimensions.iter().map(|d| {
                     match d {
                         CompExpr::Value(Value::Integer(i)) => *i as usize,
                         _ => 0
                     }
                 }).collect();
-                match val.len() {
-                    0 => VarSymbol::primitive(&mut manager, *identifier, BasicType::Null, Val::Int(-1), false),
-                    1 => VarSymbol::primitive(&mut manager, *identifier, BasicType::from(val[0].clone()), val[0].clone(), false),
-                    _ => VarSymbol::array(&mut manager, *identifier, BasicType::Int, val, dim, false)
-                }
+                manager.new_var_symbol(identifier, val, is_global)
             },
             _ => panic!("Invalid Variable Type")
         }
