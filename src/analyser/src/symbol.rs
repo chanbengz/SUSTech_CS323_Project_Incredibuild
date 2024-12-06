@@ -21,9 +21,10 @@ pub type FuncSymbol = Symbol<FuncType>;
 		- Array Type `(Vec<usize>, Vec<Value>)`
 		- Struct Type `(Vec<VarType>)`
 	- Function Type `FuncType`
-		- `(FuncReturnType, Vec<VarType>)`
+		- `(BasicType, Vec<VarType>)`
 	Different　Symbols are stored in different Symbol Tables.
 */
+
 #[derive(Clone, Debug)]
 pub enum VarType {
 	Primitive(PrimType),
@@ -33,8 +34,8 @@ pub enum VarType {
 
 pub type PrimType = (BasicType);
 pub type ArrayType = (BasicType, Vec<usize>);
-pub type StructType = (Vec<String>, Vec<VarType>);
-pub type FuncType = (FuncReturnType, Vec<VarType>);
+pub type StructType = (String, Vec<(String, VarType)>);
+pub type FuncType = (BasicType, Vec<VarType>);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BasicType {
@@ -44,15 +45,4 @@ pub enum BasicType {
 	Bool,
 	String,
 	Null
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum FuncReturnType {
-	Int,
-	Char,
-	Float,
-	Bool,
-	String,
-	#[default]
-	Void
 }

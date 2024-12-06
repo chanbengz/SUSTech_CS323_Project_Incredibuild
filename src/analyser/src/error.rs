@@ -34,6 +34,10 @@ pub enum SemanticError {
         message: String,
         line: usize,
     },
+    #[error("[Semantic Error] Not Implemented Feature Error: {message:?}")]
+    NotImplementedFeatureError{
+        message: String,
+    },
 	#[error("System error: {0}")]
 	SystemError(String),
 

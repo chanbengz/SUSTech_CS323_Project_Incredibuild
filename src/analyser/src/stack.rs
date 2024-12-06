@@ -1,5 +1,6 @@
 use crate::table::ScopeTable;
-use crate::symbol::{VarSymbol, FuncSymbol};
+use crate::symbol::{VarSymbol, FuncSymbol, VarType, StructType};
+use std::process::id;
 use std::rc::Rc;
 use std::cell::RefCell;
 use crate::error::SemanticError;
@@ -7,6 +8,7 @@ use crate::error::SemanticError;
 #[derive(Clone, Debug)]
 pub struct ScopeStack {
     pub func_scope: Rc<RefCell<ScopeTable<FuncSymbol>>>,
+    pub struct_scope: Rc<RefCell<ScopeTable<StructType>>>,
     pub stack: Vec<Rc<RefCell<ScopeTable<VarSymbol>>>>,
     depth: usize,
 }
@@ -14,8 +16,9 @@ pub struct ScopeStack {
 impl ScopeStack {
     pub fn new() -> Self {
         let func_scope = Rc::new(RefCell::new(ScopeTable::new()));
+        let struct_scope = Rc::new(RefCell::new(ScopeTable::new()));
         let stack = vec![Rc::new(RefCell::new(ScopeTable::new()))];
-        ScopeStack { func_scope, stack , depth: 0}
+        ScopeStack { func_scope, struct_scope, stack , depth: 0}
     }
 
     // Scope Relevant
@@ -60,22 +63,6 @@ impl ScopeStack {
         }
     }
 
-    pub fn update_var_symbol(&self, symbol: VarSymbol) -> Result<(), SemanticError> {
-        // Update the symbol in the top scope
-        for scope in self.stack.iter().rev() {
-            if let Some(current_symbol) = scope.borrow().lookup(&symbol.identifier) {
-                let mut current_symbol = current_symbol.clone();
-                current_symbol.symbol_type = symbol.symbol_type.clone();
-                return Ok(());
-            }
-        }
-        Err(SemanticError::ReferenceError {
-            id: 1,
-            variable: symbol.identifier.clone(),
-            line: 0,
-        })
-    }
-
     pub fn get_var_symbol(&self, identifier: &String) -> Result<VarSymbol, SemanticError> {
         // Search for the symbol in the stack from top to bottom
         for scope in self.stack.iter().rev() {
@@ -86,6 +73,67 @@ impl ScopeStack {
         Err(SemanticError::ReferenceError {
             id: 1,
             variable: identifier.clone(),
+            line: 0,
+        })
+    }
+
+    pub fn validate_var_symbol(&self, identifier: &String, dim: Vec<usize>) -> Result<VarType, SemanticError> {
+        // Search for the symbol in the stack from top to bottom
+        for scope in self.stack.iter().rev() {
+            if let Some(symbol) = scope.borrow().lookup(identifier) {
+                match &symbol.symbol_type {
+                    VarType::Array((_, dimensions)) => {
+                        if dimensions.len() != dim.len() {
+                            return Err(SemanticError::TypeError {
+                                id: 23,
+                                message: "Dimension Mismatched".to_string(),
+                                line: 0,
+                            });
+                        }
+                        return Ok(symbol.symbol_type.clone());
+                    }
+                    _ => {
+                        if dim.len() > 0 {
+                            return Err(SemanticError::TypeError {
+                                id: 10,
+                                message: "Applying indexing operator ([…]) on non-array type variables".to_string(),
+                                line: 0,
+                            });
+                        }
+                        return Ok(symbol.symbol_type.clone());
+                    }
+                }
+            }
+        }
+        Err(SemanticError::ReferenceError {
+            id: 1,
+            variable: identifier.clone(),
+            line: 0,
+        })
+    }
+
+    // Struct Relevant
+    pub fn define_struct(&self, struct_type: StructType) -> Result<(), SemanticError> {
+        let (identifier, _) = struct_type.clone();
+        if self.struct_scope.borrow().lookup(&identifier).is_some() {
+            return Err(SemanticError::RedefinitionError {
+                id: 15,
+                variable: identifier.clone(),
+                line: 0,
+            });
+        }else {
+            self.struct_scope.borrow_mut().insert(identifier.clone(), struct_type);
+            Ok(())
+        }
+    }
+
+    pub fn get_struct(&self, type_t: &String) -> Result<StructType, SemanticError> {
+        if let Some(struct_type) = self.struct_scope.borrow().lookup(type_t) {
+            return Ok(struct_type.clone());
+        }
+        Err(SemanticError::ReferenceError {
+            id: 14,
+            variable: type_t.clone(),
             line: 0,
         })
     }

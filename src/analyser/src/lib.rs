@@ -32,7 +32,7 @@ mod tests {
         int main(){
             int a = 0;
             int b = 1;
-            {
+            if(a == 2){
                 int a = 1;
                 int b = 2;
             }

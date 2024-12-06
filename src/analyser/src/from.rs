@@ -4,6 +4,7 @@ use spl_ast::tree::{Value, Variable, CompExpr};
 use crate::manager::SymbolManager;
 use crate::symbol::*;
 use crate::error::SemanticError;
+use crate::typer::FuncRetType;
 
 impl From<Value> for BasicType {
     fn from(value: Value) -> BasicType {
@@ -14,6 +15,19 @@ impl From<Value> for BasicType {
             Value::Bool(_) => BasicType::Bool,
             Value::String(_) => BasicType::String,
             Value::Null => BasicType::Null
+        }
+    }
+}
+
+impl From<BasicType> for FuncRetType {
+    fn from(basic_type: BasicType) -> FuncRetType {
+        match basic_type {
+            BasicType::Int => FuncRetType::Int,
+            BasicType::Float => FuncRetType::Float,
+            BasicType::Char => FuncRetType::Char,
+            BasicType::Bool => FuncRetType::Bool,
+            BasicType::String => FuncRetType::String,
+            BasicType::Null => FuncRetType::Void
         }
     }
 }
