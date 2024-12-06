@@ -2,6 +2,7 @@ extern crate llvm_ir as llvm;
 
 use spl_parser::{parse_from_file};
 use clap::{Arg, Command};
+use colored::Colorize;
 // use std::ffi::CString;
 // use std::ptr;
 
@@ -20,9 +21,9 @@ fn main() {
 
     let parsed_input = parse_from_file(&source_path);
     match parsed_input {
-        Ok(_) => println!("[32mParsed successfully[0m"),
+        Ok(_) => println!("{}", "Parsed successfully".green()),
         Err(e) => {
-            println!("{}", e);
+            println!("{}", e.red());
         }
     }
 

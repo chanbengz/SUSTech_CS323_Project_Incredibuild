@@ -56,12 +56,13 @@ pub enum CompExpr {
     Value(Value),
     Variable(Variable),
     FuncCall(Function),
-    // Mind that UnaryOperator can only operate on 
+    // Mind that UnaryOperator can only operate on
     // Integer, Float and Bool. (Remember might need
     // to cope with array types)
     UnaryOperation(UnaryOperator, Box<CompExpr>),
     // Binary Operator can operate on all types of Values.
     BinaryOperation(Box<CompExpr>, BinaryOperator, Box<CompExpr>),
+    MissingRP,
     Invalid,
     Error
 }

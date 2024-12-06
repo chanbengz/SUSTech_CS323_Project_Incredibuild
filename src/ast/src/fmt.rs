@@ -83,6 +83,7 @@ impl fmt::Display for CompExpr {
             CompExpr::UnaryOperation(op, expr) => write!(f, "({} {})", op, expr),
             CompExpr::BinaryOperation(left, op, right) => write!(f, "({} {} {})", left, op, right),
             CompExpr::FuncCall(func) => write!(f, "{}", func),
+            CompExpr::MissingRP => write!(f, "[CompExprError]"),
             CompExpr::Invalid => write!(f, "[Invalid]"),
             CompExpr::Error => write!(f, "[CompExprError]"),
         }

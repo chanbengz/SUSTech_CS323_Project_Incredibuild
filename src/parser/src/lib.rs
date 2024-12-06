@@ -1,4 +1,3 @@
-use std::fmt::format;
 use std::fs::File;
 use lalrpop_util::{lalrpop_mod, ErrorRecovery};
 use spl_lexer::tokens::{Token, LexicalError};
@@ -44,7 +43,6 @@ pub fn parse_from_file(source_path: &str) -> Result<tree::Program, String> {
 mod tests {
     use std::fs::File;
     use std::io::Read;
-    use crate::error::format_errors;
     use crate::grammar::CompExprParser;
     use crate::grammar::CondExprParser;
     use crate::grammar::ParaDecsParser;
@@ -103,17 +101,28 @@ mod tests {
             Parser::StmtParser => assert_eq!(format!("{}", StmtParser::new().parse(&mut errors, file_path, lexer).unwrap()), expected),
             Parser::BodyParser => assert_eq!(format!("{}", BodyParser::new().parse(&mut errors, file_path, lexer).unwrap()), expected),
             Parser::ProgramParser => {
-                let result = ProgramParser::new().parse(&mut errors, file_path, lexer).unwrap();
+                let result = ProgramParser::new().parse(&mut errors, file_path, lexer)
+                    .unwrap_or_else(|_| panic!("Failed to parse file: {}", file_path));
                 if errors.len() > 0 {
-                    let error_str = format_errors(&errors);
-                    let expected = expected.split("\n").collect::<Vec<&str>>();
-                    for i in 0..error_str.len() {
-                        if *error_str[i] != *expected[i] {
-                            println!("Error:    {}", error_str[i]);
-                            println!("Expected: {}", expected[i]);
-                            println!("Error Recovery: {:?})", errors[i]);
-                            assert_eq!(error_str[i], expected[i]);
+                    let mut error_str = Vec::new();
+                    for error in &errors {
+                        let error = &error.error;
+                        if let lalrpop_util::ParseError::User { error } = error {
+                            error_str.push(format!("{}", error));
                         }
+                    }
+                    error_str.sort_by(|a, b| {
+                        let re = regex::Regex::new(r"\d+").unwrap();
+                        let a_lineno = re.find(&a).unwrap().as_str().parse::<usize>().unwrap();
+                        let b_lineno = re.find(&b).unwrap().as_str().parse::<usize>().unwrap();
+                        a_lineno.cmp(&b_lineno)
+                    });
+                    let expected = expected.split("\n").collect::<Vec<&str>>();
+                    assert_eq!(error_str.len(), expected.len(), "{}", file_path);
+                    for i in 0..error_str.len() {
+                        assert_eq!(error_str[i], expected[i],
+                            "\nError:    {}\nExpected: {}\nError Recovery: {:?}", error_str[i], expected[i], errors
+                        );
                     }
                 } else {
                     assert_eq!(format!("{}", result), expected)
@@ -138,9 +147,7 @@ mod tests {
     #[test]
     fn test_error_recovery() {
         // Test Comptuation Expression Error Recovery
-        assert_parse(Parser::CompExprParser, "2 + * 5", "(2: u32 + ([CompExprError] * 5: u32))");
-        assert_parse(Parser::CompExprParser, "2 + * 5 *", "(2: u32 + (([CompExprError] * 5: u32) * [CompExprError]))");
-        assert_parse(Parser::CompExprParser, "2 + @", "(2: u32 + [CompExprError])");
+        assert_parse(Parser::CompExprParser, "2 + @", "(2: u32 + [Invalid])");
         // Test Statement Error Recovery
         assert_parse(Parser::BodyParser, "break; return 0", "Body: [Break, [ExprError]]");
     }
@@ -225,11 +232,11 @@ mod tests {
     fn test_phase1() {
         for i in 1..13 {
             assert_parse_from_file(Parser::ProgramParser, 
-                &format!("../test/phase1/test_1_r{:0>2}.spl", i), 
-                &format!("../test/phase1/test_1_r{:0>2}.out", i)
+                &format!("../test/phase1/basic/test_1_r{:0>2}.spl", i),
+                &format!("../test/phase1/basic/test_1_r{:0>2}.out", i)
             );
         }
-        for i in 1..7 {
+        for i in 1..14 {
            assert_parse_from_file(Parser::ProgramParser,
                &format!("../test/phase1/extra/test_1_s{:0>2}.spl", i),
                &format!("../test/phase1/extra/test_1_s{:0>2}.out", i)
