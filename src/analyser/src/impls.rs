@@ -13,7 +13,6 @@ impl<T> Symbol<T> {
     }
 }
 
-
 // From for VarSymbol
 impl VarSymbol {
     pub fn primitive(manager: &mut SymbolManager, identifier: String, type_t: BasicType, is_global: bool) -> VarSymbol {

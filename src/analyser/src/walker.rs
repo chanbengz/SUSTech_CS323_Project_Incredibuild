@@ -5,21 +5,24 @@ use crate::manager::SymbolManager;
 use crate::error::SemanticError;
 use crate::symbol::*;
 use crate::stack::ScopeStack;
+use crate::typer::TypeChecker;
 
 pub struct Walker {
     pub program: Program,
+    pub symbol_tables: ScopeStack,
     pub manager: SymbolManager,
     pub errors: Vec<SemanticError>,
-    pub symbol_tables: ScopeStack,
+    pub typer: TypeChecker
 }
 
 impl Walker {
     pub fn new(program: Program, manager: SymbolManager) -> Walker {
         Walker {
-            program,
-            manager,
+            program: program,
+            manager: manager,
             errors: Vec::new(),
-            symbol_tables: ScopeStack::new()
+            symbol_tables: ScopeStack::new(),
+            typer: TypeChecker::new()
         }
     }
 
@@ -81,10 +84,19 @@ impl Walker {
         }
     }
 
-    fn traverse_variable(&mut self, variable: &Variable) {
+    fn traverse_variable(&mut self, variable: &Variable) -> Option<VarType> {
         match variable {
             Variable::VarReference(name, dimensions) => {
                 println!("VarReference: {:?}, Dimensions: {:?}", name, dimensions);
+                match self.symbol_tables.get_var_symbol(name) {
+                    Ok(symbol) => {
+                        return Some(symbol.symbol_type.clone());
+                    }
+                    Err(err) => {
+                        self.errors.push(err);
+                        return None;
+                    }
+                }
             }
             Variable::VarDeclaration(name, values, dimensions) => {
                 println!("VarDeclaration: {:?}, Values: {:?}, Dimensions: {:?}", name, values, dimensions);
@@ -120,45 +132,40 @@ impl Walker {
                 );
                 match self.symbol_tables.define_var_symbol(new_symbol) {
                     Ok(()) => {
-                        println!("Variable symbol defined successfully");
+                        return Some(VarType::Primitive(BasicType::from(*values.clone())));
                     }
                     Err(err) => {
-                        self.errors.push(err)
+                        self.errors.push(err);
+                        return None;
                     }
                 }
             }
             Variable::VarAssignment(name, value, dimensions) => {
                 println!("VarAssignment: {:?}, Value: {:?}, Dimensions: {:?}", name, value, dimensions);
-                match self.symbol_tables.get_var_symbol(name) {
-                    Ok(symbol) => {
-                        
-                    }
-                    Err(err) => {
-                        self.errors.push(err)
-                    }
-                }
+                return None;
             }
-            Variable::StructReference(name) => println!("StructReference: {:?}", name),
+            Variable::StructReference(name) => {
+                println!("StructReference: {:?}", name);
+                return None;
+            }
             Variable::StructDefinition(name, variables) => {
-                println!("StructDefinition: {:?}", name);
-                for var in variables.iter() {
-                    self.traverse_variable(var);
-                }
+                return None;
             }
             Variable::StructDeclaration(obj_type, name, variables) => {
-                println!("StructDeclaration: {:?}, Name: {:?}", obj_type, name);
-                for var in variables.iter() {
-                    self.traverse_variable(var);
-                }
+                return None;
             }
             Variable::StructAssignment(name, field, value) => {
-                println!("StructAssignment: {:?}, Field: {:?}, Value: {:?}", name, field, value);
+                return None;
             }
-            Variable::MemberReference(name, field) => println!("MemberReference: {:?}, Field: {:?}", name, field),
+            Variable::MemberReference(name, field) => {
+                return None;
+            },
             Variable::FormalParameter(name, values, dimensions) => {
-                println!("FormalParameter: {:?}, Values: {:?}, Dimensions: {:?}", name, values, dimensions);
+                return None;
             }
-            Variable::Error => println!("Error in Variable"),
+            Variable::Error => {
+                return None;
+            }
         }
     }
 
