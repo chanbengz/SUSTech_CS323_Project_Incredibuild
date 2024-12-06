@@ -194,7 +194,7 @@ pub Stmt: tree::Statement = {
                         end: r
                     }, "semicolon ';'".to_string())
                 },
-                dropped_tokens: Vec::new(), // or specify the dropped tokens
+                dropped_tokens: Vec::new(),
             };
             errors.push(error);
         }
@@ -528,7 +528,19 @@ WhileExpr: tree::Expr = {
 }
 
 ForExpr: tree::Expr = {
-    "for" "(" <init:VarManagement> ";" <cond:CondExpr> ";" <update:VarManagement> ")" "{" <body:Body> "}" => {
+    "for" "(" <init:VarManagement?> ";" <cond:CondExpr?> ";" <update:VarManagement?> ")" "{" <body:Body> "}" => {
+        let init = match init {
+            Some(init) => init,
+            None => tree::Expr::VarManagement(Vec::new())
+        };
+        let cond = match cond {
+            Some(cond) => cond,
+            None => Box::new(tree::CondExpr::Bool(true))
+        };
+        let update = match update {
+            Some(update) => update,
+            None => tree::Expr::VarManagement(Vec::new())
+        };
         tree::Expr::Loop(
             tree::Loop::ForExpr(
                 Box::new(init),
@@ -684,7 +696,7 @@ VarDec: tree::Variable = {
 }
 
 StructDec: tree::Variable = {
-    "." <ident: Identifier> ":" <val: CompExpr> => {
+    "." <ident: Identifier> "=" <val: CompExpr> => {
         tree::Variable::VarAssignment(
             Box::new(ident),
             val,

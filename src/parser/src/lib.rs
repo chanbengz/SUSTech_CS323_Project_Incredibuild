@@ -1,10 +1,11 @@
+use std::fmt::format;
 use std::fs::File;
 use lalrpop_util::{lalrpop_mod, ErrorRecovery};
 use spl_lexer::tokens::{Token, LexicalError};
 
 lalrpop_mod!(pub grammar); // synthesized by LALRPOP
 use spl_ast::tree;
-pub use crate::error::display_error;
+pub use crate::error::emit_error;
 use crate::grammar::ProgramParser;
 
 pub mod error;
@@ -31,12 +32,11 @@ pub fn parse_from_file(source_path: &str) -> Result<tree::Program, String> {
     let mut errors = Vec::new();
     let lexer = spl_lexer::lexer::Lexer::new(&source);
     let result = ProgramParser::new().parse(&mut errors, source_path, lexer);
-    match result {
-        Ok(ast) => Ok(ast),
-        Err(_) => {
-            display_error(&errors, &source, source_path);
-            Err(format!("\n{} syntax error(s) found", errors.len()))
-        }
+    if errors.len() == 0 && result.is_ok() {
+        Ok(result.unwrap())
+    } else {
+        emit_error(&errors);
+        Err(format!("\n{} syntax error(s) found", errors.len()))
     }
 }
 
