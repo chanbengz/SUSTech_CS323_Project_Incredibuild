@@ -23,8 +23,8 @@ impl VarSymbol {
         manager.new_var_symbol(identifier, VarType::Array((type_t, dimensions)), is_global)
     }
 
-    pub fn struct_type(manager: &mut SymbolManager, identifier: String, fields: (Vec<String>, Vec<VarType>), is_global: bool) -> VarSymbol {
-        manager.new_var_symbol(identifier, VarType::Struct(fields), is_global)
+    pub fn struct_type(manager: &mut SymbolManager, struct_type: String, identifier: String, fields: Vec<(String, VarType)>, is_global: bool) -> VarSymbol {
+        manager.new_var_symbol(identifier, VarType::Struct((struct_type, fields)), is_global)
     }
 
     pub fn get_primitive(&self) -> Option<BasicType> {
@@ -41,31 +41,35 @@ impl VarSymbol {
         }
     }
 
-    pub fn get_struct_field(&self, field: String) -> Option<BasicType> {
+    pub fn get_struct_field(&self, field: String) -> Option<VarType> {
         match &self.symbol_type {
-            VarType::Struct((fields, types)) => {
-                for i in 0..fields.len() {
-                    if fields[i] == field {
-                        return match &types[i] {
-                            VarType::Primitive(t) => Some(*t),
-                            _ => None,
-                        }
+            VarType::Struct((_ , fields)) => {
+                for i in fields.iter() {
+                    if i.0 == field {
+                        return Some(i.1.clone());
                     }
                 }
                 None
             },
             _ => None,
         }
-    } 
+    }
+
+    pub fn get_struct_type(&self) -> Option<String> {
+        match &self.symbol_type {
+            VarType::Struct((t, _)) => Some(t.clone()),
+            _ => None,
+        }
+    }
 }
 
 // From for FuncSymbol
 impl FuncSymbol {
-    fn define(manager: &mut SymbolManager, identifier: String, return_type: FuncReturnType, parameters: Vec<VarType>) -> FuncSymbol {
+    fn define(manager: &mut SymbolManager, identifier: String, return_type: BasicType, parameters: Vec<VarType>) -> FuncSymbol {
         manager.new_func_symbol(identifier, (return_type, parameters), true)
     }
 
-    fn get_return_type(&self) -> FuncReturnType {
+    fn get_return_type(&self) -> BasicType {
         match &self.symbol_type {
             (t, _) => t.clone(),
         }

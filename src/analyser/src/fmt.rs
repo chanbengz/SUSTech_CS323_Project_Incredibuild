@@ -1,5 +1,5 @@
 use std::fmt::{Display, Result};
-use crate::symbol::{Symbol, VarType, BasicType, FuncReturnType};
+use crate::symbol::{Symbol, VarType, BasicType};
 use crate::table::ScopeTable;
 use crate::stack::ScopeStack;
 
@@ -29,12 +29,6 @@ impl Display for VarType {
 }
 
 impl Display for BasicType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl Display for FuncReturnType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result {
         write!(f, "{:?}", self)
     }
