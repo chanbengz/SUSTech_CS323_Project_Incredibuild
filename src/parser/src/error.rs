@@ -8,12 +8,12 @@ pub fn display_error(errors: &Vec<ErrorRecovery<usize, Token, LexicalError>>, in
     for error in errors {
         let error = &error.error;
         if let lalrpop_util::ParseError::User { error } = error { match error {
-            LexicalError::MissingLexeme(l, token, r) => {
-                let lineno = input[..*l].lines().count();
+            LexicalError::MissingLexeme(span, token) => {
+                let lineno = input[..span.start].lines().count();
                 let lineno = if lineno == 0 { 1 } else { lineno };
-                let begin = input[..*l].rfind('\n').unwrap_or(0);
+                let begin = input[..span.start].rfind('\n').unwrap_or(0);
                 line_error(
-                    (*l - begin, *r - begin), lineno,
+                    (span.start - begin, span.end - begin), lineno,
                     lines[lineno - 1],
                     &format!("{} missing {} [{}]",
                         "error:".red(), token.as_str(), "B".red()
@@ -21,12 +21,12 @@ pub fn display_error(errors: &Vec<ErrorRecovery<usize, Token, LexicalError>>, in
                     source_path
                 );
             },
-            LexicalError::UnknownLexeme(l, r) => {
-                let lineno = input[..*l].lines().count();
+            LexicalError::UnknownLexeme(span) => {
+                let lineno = input[..span.start].lines().count();
                 let lineno = if lineno == 0 { 1 } else { lineno };
-                let begin = input[..*l].rfind('\n').unwrap_or(0);
+                let begin = input[..span.start].rfind('\n').unwrap_or(0);
                 line_error(
-                    (*l - begin, *r - begin), lineno,
+                    (span.start - begin, span.end - begin), lineno,
                     lines[lineno - 1],
                     &format!("{} unknown lexeme [{}]",
                          "error:".red(), "A".red()
@@ -51,26 +51,21 @@ fn line_error( span: (usize, usize), lineno: usize, line_str: &str, error_msg: &
     )
 }
 
-pub fn format_errors(errors: &Vec<ErrorRecovery<usize, Token, LexicalError>>, input: &str) -> String {
+pub fn format_errors(errors: &Vec<ErrorRecovery<usize, Token, LexicalError>>)
+    -> Vec<String> {
     let mut error_str = Vec::new();
     for error in errors {
         let error = &error.error;
-        if let lalrpop_util::ParseError::User { error } = error { match error {
-            LexicalError::MissingLexeme(l, token, _) => {
-                let lineno = input[..*l].lines().count();
-                let lineno = if lineno == 0 { 1 } else { lineno };
-                error_str.push((lineno, format!("Error type B at Line {}: Missing {}\n",
-                    lineno, token.as_str()).to_owned()));
-            },
-            LexicalError::UnknownLexeme(l, r) => {
-                let lineno = input[..*l].lines().count();
-                error_str.push((lineno, format!("Error type A at Line {}: unknown lexeme {}\n",
-                    lineno, input[*l..*r].to_string()).to_owned()));
-            }, _ => {} }
+        if let lalrpop_util::ParseError::User { error } = error {
+            error_str.push(format!("{}", error));
         }
     }
 
-    error_str.sort_by(|(a, _), (b, _)| a.cmp(b));
-    let error_str = error_str.into_iter().map(|(_, s)| s.to_owned()).collect::<String>();
-    error_str.trim().to_string()
+    error_str.sort_by(|a, b| {
+        let re = regex::Regex::new(r"\d+").unwrap();
+        let a_lineno = re.find(&a).unwrap().as_str().parse::<usize>().unwrap();
+        let b_lineno = re.find(&b).unwrap().as_str().parse::<usize>().unwrap();
+        a_lineno.cmp(&b_lineno)
+    });
+    error_str
 }

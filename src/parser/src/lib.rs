@@ -13,7 +13,7 @@ use std::io::Read;
 pub fn parse(source: &str) -> Result<tree::Program, Vec<ErrorRecovery<usize, Token, LexicalError>>> {
     let mut errors = Vec::new();
     let lexer = spl_lexer::lexer::Lexer::new(&source);
-    let result = ProgramParser::new().parse(&mut errors, lexer).unwrap();
+    let result = ProgramParser::new().parse(&mut errors, "", lexer).unwrap();
     if errors.len() > 0 {
         Err(errors.to_owned())
     } else {
@@ -28,10 +28,12 @@ pub fn parse_from_file(source_path: &str) -> Result<tree::Program, String> {
         .read_to_string(&mut source)
         .expect("Failed to read file");
 
-    let result = parse(&source);
+    let mut errors = Vec::new();
+    let lexer = spl_lexer::lexer::Lexer::new(&source);
+    let result = ProgramParser::new().parse(&mut errors, source_path, lexer);
     match result {
         Ok(ast) => Ok(ast),
-        Err(errors) => {
+        Err(_) => {
             display_error(&errors, &source, source_path);
             Err(format!("\n{} syntax error(s) found", errors.len()))
         }
@@ -66,14 +68,14 @@ mod tests {
         let lexer = spl_lexer::lexer::Lexer::new(&source);
 
         match parser {
-            Parser::CompExprParser => assert_eq!(format!("{}", CompExprParser::new().parse(&mut errors, lexer).unwrap()), expected),
-            Parser::CondExprParser => assert_eq!(format!("{}", CondExprParser::new().parse(&mut errors, lexer).unwrap()), expected),
-            Parser::ParaDecsParser => assert_eq!(format!("{}", ParaDecsParser::new().parse(&mut errors, lexer)
+            Parser::CompExprParser => assert_eq!(format!("{}", CompExprParser::new().parse(&mut errors, "", lexer).unwrap()), expected),
+            Parser::CondExprParser => assert_eq!(format!("{}", CondExprParser::new().parse(&mut errors, "",  lexer).unwrap()), expected),
+            Parser::ParaDecsParser => assert_eq!(format!("{}", ParaDecsParser::new().parse(&mut errors, "", lexer)
                     .unwrap().iter().map(|x| format!("{}", x)).collect::<Vec<String>>().join(", ")), expected), 
-            Parser::FuncDecParser => assert_eq!(format!("{}", FuncDecParser::new().parse(&mut errors, lexer).unwrap()), expected),
-            Parser::StmtParser => assert_eq!(format!("{}", StmtParser::new().parse(&mut errors, lexer).unwrap()), expected),
-            Parser::ProgramParser => assert_eq!(format!("{}", ProgramParser::new().parse(&mut errors, lexer).unwrap()), expected),
-            Parser::BodyParser => assert_eq!(format!("{}", BodyParser::new().parse(&mut errors, lexer).unwrap()), expected),
+            Parser::FuncDecParser => assert_eq!(format!("{}", FuncDecParser::new().parse(&mut errors, "", lexer).unwrap()), expected),
+            Parser::StmtParser => assert_eq!(format!("{}", StmtParser::new().parse(&mut errors, "", lexer).unwrap()), expected),
+            Parser::ProgramParser => assert_eq!(format!("{}", ProgramParser::new().parse(&mut errors, "", lexer).unwrap()), expected),
+            Parser::BodyParser => assert_eq!(format!("{}", BodyParser::new().parse(&mut errors, "", lexer).unwrap()), expected),
         }
     }
 
@@ -93,30 +95,24 @@ mod tests {
         let lexer = spl_lexer::lexer::Lexer::new(&src_content);
 
         match parser {
-            Parser::CompExprParser => assert_eq!(format!("{}", CompExprParser::new().parse(&mut errors, lexer).unwrap()), expected),
-            Parser::CondExprParser => assert_eq!(format!("{}", CondExprParser::new().parse(&mut errors, lexer).unwrap()), expected),
-            Parser::ParaDecsParser => assert_eq!(format!("{}", ParaDecsParser::new().parse(&mut errors, lexer)
+            Parser::CompExprParser => assert_eq!(format!("{}", CompExprParser::new().parse(&mut errors, file_path, lexer).unwrap()), expected),
+            Parser::CondExprParser => assert_eq!(format!("{}", CondExprParser::new().parse(&mut errors, file_path, lexer).unwrap()), expected),
+            Parser::ParaDecsParser => assert_eq!(format!("{}", ParaDecsParser::new().parse(&mut errors, file_path, lexer)
                     .unwrap().iter().map(|x| format!("{}", x)).collect::<Vec<String>>().join(", ")), expected), 
-            Parser::FuncDecParser => assert_eq!(format!("{}", FuncDecParser::new().parse(&mut errors, lexer).unwrap()), expected),
-            Parser::StmtParser => assert_eq!(format!("{}", StmtParser::new().parse(&mut errors, lexer).unwrap()), expected),
-            Parser::BodyParser => assert_eq!(format!("{}", BodyParser::new().parse(&mut errors, lexer).unwrap()), expected),
+            Parser::FuncDecParser => assert_eq!(format!("{}", FuncDecParser::new().parse(&mut errors, file_path, lexer).unwrap()), expected),
+            Parser::StmtParser => assert_eq!(format!("{}", StmtParser::new().parse(&mut errors, file_path, lexer).unwrap()), expected),
+            Parser::BodyParser => assert_eq!(format!("{}", BodyParser::new().parse(&mut errors, file_path, lexer).unwrap()), expected),
             Parser::ProgramParser => {
-                let result = ProgramParser::new().parse(&mut errors, lexer).unwrap();
+                let result = ProgramParser::new().parse(&mut errors, file_path, lexer).unwrap();
                 if errors.len() > 0 {
-                    let error_str = format_errors(&errors, &src_content);
-                    // assert_eq!(error_str, expected)
-                    match (&error_str, &expected) {
-                        (error_str, expected) => {
-                            let error_str = error_str.split("\n").collect::<Vec<&str>>();
-                            let expected = expected.split("\n").collect::<Vec<&str>>();
-                            for i in 0..error_str.len() {
-                                if *error_str[i] != *expected[i] {
-                                    println!("Error:    {}", error_str[i]);
-                                    println!("Expected: {}", expected[i]);
-                                    println!("Error Recovery: {:?})", errors[i]);
-                                    assert_eq!(error_str[i], expected[i]);
-                                }
-                            }
+                    let error_str = format_errors(&errors);
+                    let expected = expected.split("\n").collect::<Vec<&str>>();
+                    for i in 0..error_str.len() {
+                        if *error_str[i] != *expected[i] {
+                            println!("Error:    {}", error_str[i]);
+                            println!("Expected: {}", expected[i]);
+                            println!("Error Recovery: {:?})", errors[i]);
+                            assert_eq!(error_str[i], expected[i]);
                         }
                     }
                 } else {

@@ -16,7 +16,16 @@
 
 use logos::{Logos, FilterResult};
 use std::fmt;
+use std::fs::File;
+use std::io::Read;
 use std::num::ParseIntError;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Span {
+    pub source: String,
+    pub start: usize,
+    pub end: usize
+}
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub enum LexicalError {
@@ -26,8 +35,8 @@ pub enum LexicalError {
     UnexpectedEndOfProgram,
     NonAsciiCharacter,
     // error for parser
-    MissingLexeme(usize, String, usize),
-    UnknownLexeme(usize, usize),
+    MissingLexeme(Span, String),
+    UnknownLexeme(Span),
     #[default]
     UnknownToken
 }
@@ -289,11 +298,23 @@ impl fmt::Display for LexicalError {
             LexicalError::InvalidInteger(s) => write!(f, "{}", s),
             LexicalError::InvalidCharacter(s) => write!(f, "{}", s),
             LexicalError::InvalidString(s) => write!(f, "{}", s),
-            LexicalError::MissingLexeme(start, token, _end) => write!(f, "Missing {} at {}", token, start),
-            LexicalError::UnknownLexeme(start, _end) => write!(f, "Unknown lexeme at {}", start),
             LexicalError::UnexpectedEndOfProgram => write!(f, "Unexpected end of program"),
             LexicalError::UnknownToken => write!(f, "Unknown token"),
             LexicalError::NonAsciiCharacter => write!(f, "Non-ASCII character"),
+            LexicalError::MissingLexeme(span, token) => {
+                let mut input = String::new();
+                File::open(&span.source).expect("File not found").read_to_string(&mut input).expect("Error reading file");
+                let lineno = input[..span.start].lines().count();
+                let lineno = if lineno == 0 { 1 } else { lineno };
+                write!(f, "Error type B at Line {}: Missing {}", lineno, token.as_str().to_owned())
+            },
+            LexicalError::UnknownLexeme(span) => {
+                let mut input = String::new();
+                File::open(&span.source).expect("File not found").read_to_string(&mut input).expect("Error reading file");
+                let lineno = input[..span.start].lines().count();
+                write!(f, "Error type A at Line {}: unknown lexeme {}",
+                    lineno, input[span.start..span.end].to_string().to_owned())
+            },
         }
     }
 }
