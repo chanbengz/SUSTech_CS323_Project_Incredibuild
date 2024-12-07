@@ -31,14 +31,13 @@ pub enum Variable {
     VarAssignment(Box<String>, Box<CompExpr>, Box<Vec<CompExpr>>), // varname, expr, offsets
 
     // Struct is defined to realize object.
-    StructReference(Box<String>),
     StructDefinition(Box<String>, Box<Vec<Variable>>),
     // Object type, Identifier, Variables
     StructDeclaration(Box<String>, Box<String>, Box<Vec<Variable>>),
     // Identifier, Field, Variable
-    StructAssignment(Box<String>, Box<String>, Box<CompExpr>),
+    StructAssignment(Box<Variable>, Box<CompExpr>),
 
-    MemberReference(Box<String>, Box<String>),
+    MemberReference(Vec<(Box<String>, Box<String>, Box<Vec<CompExpr>>)>),
     FormalParameter(Box<String>, Box<Value>, Box<Vec<usize>>),
     Error
 }

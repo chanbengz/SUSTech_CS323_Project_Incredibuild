@@ -38,7 +38,10 @@ impl fmt::Display for Variable {
                 ident,
                 value,
                 dims.iter().map(|d| d.to_string()).collect::<Vec<String>>().join(", ")),
-            Variable::MemberReference(ident, member) => write!(f, "{}.{}", ident, member),
+            Variable::MemberReference(refs) => write!(f, "Member Reference: [{}]",
+                refs.iter().map(|(ident, field, dims)| format!("{}.{}{}", ident, field,
+                    dims.iter().map(|d| format!("[{}]", d)).collect::<Vec<String>>().join(""))).collect::<Vec<String>>().join(", ")
+            ),
             Variable::FormalParameter(ident, value, dims) => write!(f, "Formal Parameter: {} = [{}] with dimensions [{}]",
                 ident,
                 value,
@@ -47,15 +50,14 @@ impl fmt::Display for Variable {
                 dims.iter().map(|d| format!("[{}]", d)).collect::<Vec<String>>().join("")),
             Variable::VarAssignment(ident, expr, dims) => write!(f, "Variable Assignment: {}{} = {}", ident, 
                 dims.iter().map(|d| format!("[{}]", d)).collect::<Vec<String>>().join(""), expr),
-            Variable::StructReference(ident) => write!(f, "Struct Reference: {}", ident),
-            Variable::StructDefinition(ident, vars) => write!(f, "Struct Definition: {} with [{}]", 
+            Variable::StructDefinition(ident, vars) => write!(f, "Struct Definition: {} with [{}]",
                 ident, 
                 vars.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", ")),
             Variable::StructDeclaration(ident, parent, vars) => write!(f, "Struct Declaration: {} extends {} with [{}]",
                 ident, 
                 parent, 
                 vars.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", ")),
-            Variable::StructAssignment(ident, field, expr) => write!(f, "Struct Assignment: {}.{} = {}", ident, field, expr),
+            Variable::StructAssignment(var, expr) => write!(f, "Struct Assignment: {} = {}", var, expr),
 
             Variable::Error => write!(f, "[VariableError]")
         }

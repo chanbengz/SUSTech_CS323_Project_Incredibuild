@@ -597,6 +597,51 @@ ForExpr: tree::Expr = {
     },
 }
 
+StructRef: Vec<(Box<String>, Box<String>, Box<Vec<tree::CompExpr>>)> = {
+    <mut v:StructRef> "." <l:@L> <field:Identifier?> <r:@R> <dims:DimDecs?> => {
+        if field == None {
+            let error = ErrorRecovery {
+                error: ParseError::User {
+                    error: LexicalError::MissingLexeme(Span {
+                        source: source.to_string(),
+                        start: l - 1,
+                        end: l
+                    }, "field name".to_string())
+                },
+                dropped_tokens: Vec::new(),
+            };
+            errors.push(error);
+            return Vec::new();
+        }
+        let last = v.last().unwrap().clone();
+        v.push((
+            Box::new((*last.1).clone()),
+            Box::new(field.unwrap()),
+            Box::new(dims.unwrap_or(Vec::new()))
+        ));
+        v
+    },
+    <parent:Identifier> "." <l:@L> <field:Identifier?> <r:@R> => {
+        if field == None {
+            let error = ErrorRecovery {
+                error: ParseError::User {
+                    error: LexicalError::MissingLexeme(Span {
+                        source: source.to_string(),
+                        start: l - 1,
+                        end: l
+                    }, "field name".to_string())
+                },
+                dropped_tokens: Vec::new(),
+            };
+            errors.push(error);
+            return Vec::new();
+        }
+        let mut v = Vec::new();
+        v.push((Box::new(parent), Box::new(field.unwrap()), Box::new(Vec::new())));
+        v
+    },
+}
+
 VarManagement: tree::Expr = {
     /* Four types of assignment:
      * 1. Variable declaration: Specifier VarDecs;
@@ -614,25 +659,11 @@ VarManagement: tree::Expr = {
             vec![def]
         )
     },
-    <obj: Identifier> "." <l:@L> <field: Identifier?> <r:@R> "=" <val:CompExpr> => {
-        if field == None {
-            let error = ErrorRecovery {
-                error: ParseError::User {
-                    error: LexicalError::MissingLexeme(Span {
-                        source: source.to_string(),
-                        start: l - 1,
-                        end: l
-                    }, "field name".to_string())
-                },
-                dropped_tokens: Vec::new(),
-            };
-            errors.push(error);
-            return tree::Expr::Error;
-        }
+    <s:StructRef> "=" <val:CompExpr> => {
+        let s = Box::new(tree::Variable::MemberReference(s));
         tree::Expr::VarManagement(
             vec![tree::Variable::StructAssignment(
-                Box::new(obj),
-                Box::new(field.unwrap()),
+                s,
                 val
             )]
         )
@@ -1025,13 +1056,9 @@ Term: Box<tree::CompExpr> = {
             tree::Function::FuncReference(Box::new(ident), args)
         ))
     },
-    <obj:Identifier> "." <field:Identifier> => {
-        Box::new(tree::CompExpr::Variable(
-            tree::Variable::MemberReference(
-                Box::new(obj),
-                Box::new(field)
-            )
-        ))
+
+    <s:StructRef> => {
+        Box::new(tree::CompExpr::Variable(tree::Variable::MemberReference(s)))
     },
 
     // error recovery
@@ -1077,7 +1104,6 @@ Term: Box<tree::CompExpr> = {
         errors.push(error);
         Box::new(tree::CompExpr::Invalid)
     },
-
 }
 
 CondTerm: Box<tree::CondExpr> = {
