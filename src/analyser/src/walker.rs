@@ -34,6 +34,7 @@ impl Walker {
 
     pub fn traverse(&mut self) {
         let program_clone = self.program.clone();
+        println!("===================================Traversing Programs===================================");
         self.traverse_program(&program_clone);
     }
 
@@ -81,57 +82,72 @@ impl Walker {
         }
     }
 
+    fn handle_dimensions(&mut self, dimensions: Vec<CompExpr>) -> Option<Vec<usize>> {
+        if dimensions.len() == 0 {
+            return Some(Vec::new());
+        }
+
+        let dim = dimensions.iter()
+            .map(|comp_expr| {
+                match comp_expr {
+                    CompExpr::Value(Value::Int(value)) => Ok(*value as usize),
+                    _ => {
+                        if let Some(BasicType::Int) = self.traverse_comp_expr(&comp_expr) {
+                            Ok(0_usize)
+                        } else {
+                            Err(SemanticError::ImproperUsageError {
+                                id: 12,
+                                message: "Array indexing with a non-integer type expression".to_owned(),
+                                line: 0,
+                            })
+                        }
+                    }
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| {
+                self.errors.add_error(err);
+            });
+
+        if dim.len() != dimensions.len() {
+            self.errors.add_error(SemanticError::ImproperUsageError {
+                id: 12,
+                message: "Array indexing with a non-integer type expression".to_owned(),
+                line: 0,
+            });
+            None
+        }else{
+            Some(dim.ok()?)
+        }
+    }
+    
     fn traverse_variable(&mut self, variable: &Variable) -> Option<VarType> {
         match variable {
             Variable::VarReference(name, dimensions) => {
                 println!("VarReference: {:?}, Dimensions: {:?}", name, dimensions);
-                let dim = dimensions.iter()
-                    .map(|comp_expr| {
-                        if let Some(BasicType::Int) = self.traverse_comp_expr(comp_expr) {
-                            Ok(0_usize)
-                        } else {
-                            Err(SemanticError::ImproperUsageError {
-                                id: 12,
-                                message: "Array indexing with a non-integer type expression".to_owned(),
-                                line: 0,
-                            })
-                        }
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(|err| {
-                        self.errors.add_error(err);
-                    });
-                
-                match dim {
-                    Ok(dim) => match self.symbol_tables.validate_var_symbol(name, dim) {
-                        Ok(t) => Some(t),
-                        Err(err) => {
-                            self.errors.add_error(err);
-                            None
+                let dim = self.handle_dimensions(dimensions.clone())?;
+                let symbol = self.symbol_tables.get_var_symbol(name).map_err(|err| {
+                    self.errors.add_error(err);
+                }).ok()?;
+
+                match symbol.symbol_type {
+                    VarType::Array(var_def) => {
+                        if !dim.is_empty() {
+                            let (type_t, size_t) = self.typer.check_array_type(var_def.clone(), dim).map_err(|err| {
+                                self.errors.add_error(err);
+                            }).ok()?;
+                            Some(symbol.symbol_type.clone())
+                        }else {
+
                         }
                     },
-                    Err(_) => None,
+                    _ => Some(symbol.symbol_type.clone()),
                 }
             }
+            
             Variable::VarDeclaration(name, values, dimensions) => {
                 println!("VarDeclaration: {:?}, Values: {:?}, Dimensions: {:?}", name, values, dimensions);
-                // Validate all dimensions and collect them
-                let dim = dimensions.iter()
-                    .map(|comp_expr| {
-                        if let Some(BasicType::Int) = self.traverse_comp_expr(comp_expr) {
-                            Ok(0_usize)
-                        } else {
-                            Err(SemanticError::ImproperUsageError {
-                                id: 12,
-                                message: "Array indexing with a non-integer type expression".to_owned(),
-                                line: 0,
-                            })
-                        }
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(|err| {
-                        self.errors.add_error(err);
-                    });
+                let dim = self.handle_dimensions(dimensions)?;
 
                 let symbol_type = BasicType::from(*values.clone());
                 let var_type: Option<VarType> = match dim {
@@ -159,42 +175,67 @@ impl Walker {
                     }
                 }
             }
+            
             Variable::VarAssignment(name, value, dimensions) => {
                 println!("VarAssignment: {:?}, Value: {:?}, Dimensions: {:?}", name, value, dimensions);
-                let dim = dimensions.iter()
-                    .map(|comp_expr| {
-                        if let Some(BasicType::Int) = self.traverse_comp_expr(comp_expr) {
-                            Ok(0_usize)
-                        } else {
-                            Err(SemanticError::ImproperUsageError {
-                                id: 12,
-                                message: "Array indexing with a non-integer type expression".to_owned(),
-                                line: 0,
-                            })
-                        }
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(|err| {
-                        self.errors.add_error(err);
-                    });
-                
-                    match dim {
-                        Ok(dim) => match self.symbol_tables.validate_var_symbol(name, dim) {
-                            Ok(t) => Some(t),
+                // Calculate the type of right hand side
+                let val_type = self.traverse_comp_expr(value).unwrap_or(BasicType::Null);
+
+                let dim = self.traverse_dimensions(dimensions).map_err(|err| {
+                    self.errors.add_error(err);
+                }).ok()?;
+
+                let symbol = self.symbol_tables.get_var_symbol(name).map_err(|err| {
+                    self.errors.add_error(err);
+                }).ok()?;
+
+                match symbol.symbol_type {
+                    VarType::Array(var_def) => {
+                        match self.typer.check_array_type(var_def, dim) {
+                            Ok(basic_type) => {
+                                match self.typer.check_assign_operation(basic_type.0, val_type) {
+                                    Ok(b) => {
+                                        return Some(symbol.symbol_type.clone());
+                                    },
+                                    Err(err) => {
+                                        self.errors.add_error(err);
+                                        return None;
+                                    }
+                                }
+                            },
                             Err(err) => {
                                 self.errors.add_error(err);
-                                None
+                                return None;
                             }
-                        },
-                        Err(_) => None,
+                        }
+                    },
+                    VarType::Primitive(b) => {
+                        match self.typer.check_assign_operation(b, val_type) {
+                            Ok(b) => {
+                                return Some(symbol.symbol_type.clone());
+                            },
+                            Err(err) => {
+                                self.errors.add_error(err);
+                                return None;
+                            }
+                        }
                     }
-                
+                    VarType::Struct(_) => {
+                        self.errors.add_error(SemanticError::ImproperUsageError {
+                            id: 24,
+                            message: "Struct field assignment is not allowed".to_owned(),
+                            line: 0,
+                        });
+                        return None;
+                    }
+                }
             }
             
             Variable::StructReference(name) => {
                 println!("StructReference: {:?}", name);
                 return None;
             }
+
             // Define in the global scope
             Variable::StructDefinition(name, variables) => {
                 println!("StructDefinition: {:?}", name);
@@ -238,14 +279,17 @@ impl Walker {
                     }
                 }
             }
-            // Define a variable
+
+            // TODO: Define a variable
             // First check if the struct exists
             // Then check if the variable is valid
             Variable::StructAssignment(name, field, value) => {
+                println!("StructAssignment: {:?}, Field: {:?}, Value: {:?}", name, field, value);
+                // First check if the variable exists
                 let var = self.symbol_tables.get_var_symbol(name).map_err(|err| {
                     self.errors.add_error(err);
                 }).ok()?;
-
+                // Then check if the variable is a struct
                 let fields = if let VarType::Struct((_, fields)) = var.symbol_type {
                     fields
                 } else {
@@ -256,14 +300,22 @@ impl Walker {
                     });
                     return None;
                 };
-
+                // Check the type of the assigned value
                 let basic_type = self.traverse_comp_expr(&**value)?;
+                
                 fields.iter()
                     .find(|(field_name, _)| field_name == &*field.clone())
                     .and_then(|(_, field_type)| {
                         match self.typer.check_var_type(field_type.clone()) {
                             Ok(vartype) if basic_type == vartype => Some(field_type.clone()),
-                            Ok(_) => None,
+                            Ok(_) => {
+                                self.errors.add_error(SemanticError::TypeError { 
+                                    id: 5, 
+                                    message: "Unmatched types appear at both sides of the assignment operator (=)".to_owned(), 
+                                    line: 0 
+                                });
+                                None
+                            },
                             Err(err) => {
                                 self.errors.add_error(SemanticError::NotImplementedFeatureError {
                                     message: "Not supported assignment to struct field".to_owned() 
@@ -307,7 +359,20 @@ impl Walker {
                         VarType::Primitive(symbol_type.clone())
                     }
                 };
-                return Some(var_type(&dimensions));
+
+                let new_symbol = self.manager.new_var_symbol(
+                    *name.clone(), 
+                    var_type(&dimensions), 
+                    false,
+                );
+
+                match self.symbol_tables.define_var_symbol(new_symbol) {
+                    Ok(()) => Some(var_type(&dimensions)),
+                    Err(err) => {
+                        self.errors.add_error(err);
+                        None
+                    }
+                }
             }
             Variable::Error => {
                 return None;
@@ -319,34 +384,21 @@ impl Walker {
         let mut vars: Vec<(String, VarType)> = Vec::new();
         match field {
             Variable::VarDeclaration(varname, type_t, offsets) => {
-                let dim = offsets.iter()
-                    .map(|comp_expr| {
-                        if let Some(BasicType::Int) = self.traverse_comp_expr(comp_expr) {
-                            Ok(0_usize)
-                        } else {
-                            Err(SemanticError::ImproperUsageError {
-                                id: 12,
-                                message: "Array indexing with a non-integer type expression".to_owned(),
-                                line: 0,
-                            })
-                        }
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(|err| {
+                let dim = match self.traverse_dimensions(offsets.clone()) {
+                    Ok(dim) => dim,
+                    Err(err) => {
                         self.errors.add_error(err);
-                    });
+                        return None;
+                    }
+                };
 
                 let symbol_type = BasicType::from(*type_t.clone());
-                let var: Option<(String, VarType)> = match dim {
-                    Ok(dim) => {
-                        if dim.len() > 0 {
-                            Some((*varname.clone(), VarType::Array((symbol_type, dim))))
-                        } else {
-                            Some((*varname.clone(), VarType::Primitive(symbol_type)))
-                        }
-                    }
-                    Err(_) => None
+                let var: Option<(String, VarType)> = if dim.len() > 0 {
+                    Some((*varname.clone(), VarType::Array((symbol_type, dim))))
+                } else {
+                    Some((*varname.clone(), VarType::Primitive(symbol_type)))
                 };
+
                 var
             }
             Variable::StructDeclaration(type_t, identifier, variables) => {
@@ -383,8 +435,11 @@ impl Walker {
                 for param in params {
                     if let Some(arg) = self.traverse_comp_expr(param) {
                         args.push(arg);
+                    }else{
+                        args.push(BasicType::Null)
                     }
                 }
+                // println!("-> Travesing functions arguments: {:?}", args);
                 let mut params: Vec<BasicType> = Vec::new();
                 let mut return_type: FuncType = (BasicType::Null, Vec::new());
                 match self.symbol_tables.get_func_symbol(name) {
@@ -410,6 +465,7 @@ impl Walker {
                     }
                     Err(err) => {
                         self.errors.add_error(err);
+                        return None;
                     }
                 }
                 match self.typer.check_func_params(params, args) {
@@ -434,9 +490,19 @@ impl Walker {
                         params.push(var_type);
                     }
                 }
-                self.manager.new_func_symbol(*name.clone(), (ret_type, params), true);
+                // println!("-> Declaring parameters: {:?}", self.symbol_tables.get_current_scope());
+                // println!("-> Travesing functions parameters: {:?}", params);
+                let func = self.manager.new_func_symbol(*name.clone(), (ret_type, params), true);
+                match self.symbol_tables.define_func_symbol(func) {
+                    Ok(()) => {}
+                    Err(err) => {
+                        self.errors.add_error(err);
+                        return None;
+                    }
+                }
 
                 self.traverse_body(body);
+
                 match self.symbol_tables.exit_scope() {
                     Ok(()) => {}
                     Err(err) => {
@@ -627,7 +693,7 @@ impl Walker {
         }
     }
 
-    fn traverse_comp_expr(&mut self, comp: &CompExpr) -> Option<BasicType> {
+    fn traverse_comp_expr(&mut self, comp: &CompExpr) -> Option<VarType> {
         match comp {
             CompExpr::Value(value) => {
                 println!("Value: {:?}", value);
@@ -692,6 +758,9 @@ impl Walker {
                 return None;
             }
             CompExpr::Invalid => {
+                return None;
+            }
+            CompExpr::MissingRP => {
                 return None;
             }
         }

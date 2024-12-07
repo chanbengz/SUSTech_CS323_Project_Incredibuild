@@ -1,0 +1,5 @@
+[Semantic Error] Undefined Reference Error[1] at line 0: "z" undefined.
+[Semantic Error] Undefined Reference Error[1] at line 0: "a" undefined.
+[Semantic Error] Redefinition Error[3] at line 0: "b" redefined.
+[Semantic Error] Undefined Reference Error[1] at line 0: "a" undefined.
+[Semantic Error] Type Mismatch Error[10] at line 0: "The type of an argument passed to a function does not match the type of the corresponding parameter in the function definition"

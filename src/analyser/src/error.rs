@@ -1,5 +1,5 @@
 use thiserror::Error;
-
+use std::fmt;
 pub use SemanticError::*;
 
 #[derive(Clone, Error, Debug)]
@@ -75,4 +75,3 @@ impl SemanticErrorManager {
         !self.errors.is_empty()
     }
 }
-

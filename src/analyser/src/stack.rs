@@ -41,6 +41,14 @@ impl ScopeStack {
         }
     }
 
+    pub fn get_current_scope(&self) -> ScopeTable<VarSymbol> {
+        self.stack.last().unwrap().borrow().clone()
+    }
+
+    pub fn get_current_func_scope(&self) -> ScopeTable<FuncSymbol>{ 
+        self.func_scope.borrow().clone()
+    }
+
     // Variable Relevant
     pub fn define_var_symbol(&self, symbol: VarSymbol) -> Result<(), SemanticError> {
         if let Some(current_scope) = self.stack.last() {
@@ -77,44 +85,21 @@ impl ScopeStack {
         })
     }
 
-    pub fn validate_var_symbol(&self, identifier: &String, dim: Vec<usize>) -> Result<VarType, SemanticError> {
-        // Search for the symbol in the stack from top to bottom
-        for scope in self.stack.iter().rev() {
-            if let Some(symbol) = scope.borrow().lookup(identifier) {
-                match &symbol.symbol_type {
-                    VarType::Array((_, dimensions)) => {
-                        if dimensions.len() != dim.len() {
-                            return Err(SemanticError::TypeError {
-                                id: 23,
-                                message: "Dimension Mismatched".to_string(),
-                                line: 0,
-                            });
-                        }
-                        return Ok(symbol.symbol_type.clone());
-                    }
-                    _ => {
-                        if dim.len() > 0 {
-                            return Err(SemanticError::TypeError {
-                                id: 10,
-                                message: "Applying indexing operator ([…]) on non-array type variables".to_string(),
-                                line: 0,
-                            });
-                        }
-                        return Ok(symbol.symbol_type.clone());
-                    }
-                }
-            }
-        }
-        Err(SemanticError::ReferenceError {
-            id: 1,
-            variable: identifier.clone(),
-            line: 0,
-        })
-    }
-
     // Struct Relevant
     pub fn define_struct(&self, struct_type: StructType) -> Result<(), SemanticError> {
-        let (identifier, _) = struct_type.clone();
+        let (identifier, fields) = struct_type.clone();
+        // Check if there are repetitive field
+        let mut field_set = std::collections::HashSet::new();
+        for field in fields.iter() {
+            if field_set.contains(&field.0) {
+                return Err(SemanticError::RedefinitionError {
+                    id: 15,
+                    variable: field.0.clone(),
+                    line: 0,
+                });
+            }
+            field_set.insert(field.0.clone());
+        }
         if self.struct_scope.borrow().lookup(&identifier).is_some() {
             return Err(SemanticError::RedefinitionError {
                 id: 15,

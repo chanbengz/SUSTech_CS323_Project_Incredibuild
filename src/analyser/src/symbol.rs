@@ -32,7 +32,7 @@ pub enum VarType {
 	Struct(StructType)
 }
 
-pub type PrimType = (BasicType);
+pub type PrimType = BasicType;
 pub type ArrayType = (BasicType, Vec<usize>);
 pub type StructType = (String, Vec<(String, VarType)>);
 pub type FuncType = (BasicType, Vec<VarType>);
