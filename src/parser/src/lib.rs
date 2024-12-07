@@ -102,7 +102,7 @@ mod tests {
             Parser::BodyParser => assert_eq!(format!("{}", BodyParser::new().parse(&mut errors, file_path, lexer).unwrap()), expected),
             Parser::ProgramParser => {
                 let result = ProgramParser::new().parse(&mut errors, file_path, lexer)
-                    .unwrap_or_else(|_| panic!("Failed to parse file: {}", file_path));
+                    .unwrap_or_else(|e| panic!("Failed to parse file: {}\n{}", file_path, e));
                 if errors.len() > 0 {
                     let mut error_str = Vec::new();
                     for error in &errors {

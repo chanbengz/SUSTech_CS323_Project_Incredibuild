@@ -74,23 +74,22 @@ ArgList: Vec<Box<tree::CompExpr>> = {
 }
 
 VarDecs: Vec<tree::Variable> = {
-    <l:@L> <mut v:VarDecs> "," <e:VarDec?> <r:@R> => match e {
-        None => {
-            if v.len() != 0 {
-                let error = ErrorRecovery {
-                    error: ParseError::User {
-                        error: LexicalError::MissingLexeme(Span {
-                            source: source.to_string(),
-                            start: l,
-                            end: r
-                        }, "variable name".to_string())
-                    }, dropped_tokens: Vec::new(),
-                };
-                errors.push(error);
-            }
-            v
-        },
-        Some(e) => { v.push(e); v }
+    VarDecs "," <l:@L> ! <r:@R> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(Span {
+                    source: source.to_string(),
+                    start: l,
+                    end: r
+                }, "variable name".to_string())
+            }, dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        Vec::new()
+    },
+    <l:@L> <mut v:VarDecs> "," <e:VarDec> <r:@R> => {
+        v.push(e);
+        v
     },
     <e:VarDec> => vec![e],
 }
@@ -419,7 +418,7 @@ OpenExpr: tree::Expr = {
                 error: LexicalError::MissingLexeme(Span {
                     source: source.to_string(),
                     start: l,
-                    end: r
+                    end: l + 1
                 }, "opening parenthesis '('".to_string())
             },
             dropped_tokens: Vec::new(),
@@ -434,34 +433,13 @@ OpenExpr: tree::Expr = {
                 error: LexicalError::MissingLexeme(Span {
                     source: source.to_string(),
                     start: l,
-                    end: r
+                    end: l + 1
                 }, "closing parenthesis ')'".to_string())
             },
             dropped_tokens: Vec::new(),
         };
         errors.push(error);
         tree::Expr::Error
-    },
-
-    // TODO:remove this
-    <l:@L> <error:!> <r:@R> => match &error.error {
-        ParseError::UnrecognizedToken { token, expected } => {
-            if token.1 == Token::KeywordElse {
-                let error = ErrorRecovery {
-                    error: ParseError::User {
-                        error: LexicalError::StatementError(Span {
-                            source: source.to_string(),
-                            start: l,
-                            end: r
-                        }, "no 'if' before 'else'".to_string())
-                    },
-                    dropped_tokens: Vec::new(),
-                };
-                errors.push(error);
-            }
-            tree::Expr::Error
-        },
-        _ => tree::Expr::Error
     },
 }
 
@@ -552,14 +530,14 @@ CloseExpr: tree::Expr = {
         errors.push(error);
         tree::Expr::Error
     },
-    ! <l:@L> "=" CompExpr? ";" <r:@R> => {
+    <l:@R> ! <r:@R> <expr:CloseExpr>  => {
         let error = ErrorRecovery {
             error: ParseError::User {
                 error: LexicalError::StatementError(Span {
                     source: source.to_string(),
                     start: l,
                     end: r
-                }, "Unexpected statement".to_string())
+                }, "No 'if' before 'else'".to_string())
             },
             dropped_tokens: Vec::new(),
         };
@@ -608,23 +586,11 @@ WhileExpr: tree::Expr = {
 
 ForExpr: tree::Expr = {
     "for" "(" <init:VarManagement?> ";" <cond:CondExpr?> ";" <update:VarManagement?> ")" "{" <body:Body> "}" => {
-        let init = match init {
-            Some(init) => init,
-            None => tree::Expr::VarManagement(Vec::new())
-        };
-        let cond = match cond {
-            Some(cond) => cond,
-            None => Box::new(tree::CondExpr::Bool(true))
-        };
-        let update = match update {
-            Some(update) => update,
-            None => tree::Expr::VarManagement(Vec::new())
-        };
         tree::Expr::Loop(
             tree::Loop::ForExpr(
-                Box::new(init),
-                cond,
-                Box::new(update),
+                init.map(Box::new).unwrap_or(Box::new(tree::Expr::VarManagement(Vec::new()))),
+                cond.unwrap_or(Box::new(tree::CondExpr::Bool(true))),
+                update.map(Box::new).unwrap_or(Box::new(tree::Expr::VarManagement(Vec::new()))),
                 body
             )
         )
@@ -780,6 +746,21 @@ VarDec: tree::Variable = {
                     start: l,
                     end: r
                 }, "right value".to_string())
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        tree::Variable::Error
+    },
+
+    ! <l:@L> "=" CompExpr <r:@R> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::StatementError(Span {
+                    source: source.to_string(),
+                    start: l,
+                    end: r
+                }, "Unexpected statement".to_string())
             },
             dropped_tokens: Vec::new(),
         };
