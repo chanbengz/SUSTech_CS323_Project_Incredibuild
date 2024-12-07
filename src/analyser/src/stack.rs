@@ -85,41 +85,6 @@ impl ScopeStack {
         })
     }
 
-    pub fn validate_var_symbol(&self, identifier: &String, dim: Vec<usize>) -> Result<VarType, SemanticError> {
-        // Search for the symbol in the stack from top to bottom
-        for scope in self.stack.iter().rev() {
-            if let Some(symbol) = scope.borrow().lookup(identifier) {
-                match &symbol.symbol_type {
-                    VarType::Array((_, dimensions)) => {
-                        if dimensions.len() != dim.len() {
-                            return Err(SemanticError::TypeError {
-                                id: 23,
-                                message: "Dimension Mismatched".to_string(),
-                                line: 0,
-                            });
-                        }
-                        return Ok(symbol.symbol_type.clone());
-                    }
-                    _ => {
-                        if dim.len() > 0 {
-                            return Err(SemanticError::TypeError {
-                                id: 10,
-                                message: "Applying indexing operator ([…]) on non-array type variables".to_string(),
-                                line: 0,
-                            });
-                        }
-                        return Ok(symbol.symbol_type.clone());
-                    }
-                }
-            }
-        }
-        Err(SemanticError::ReferenceError {
-            id: 1,
-            variable: identifier.clone(),
-            line: 0,
-        })
-    }
-
     // Struct Relevant
     pub fn define_struct(&self, struct_type: StructType) -> Result<(), SemanticError> {
         let (identifier, fields) = struct_type.clone();

@@ -81,3 +81,18 @@ impl FuncSymbol {
         }
     }
 }
+
+impl PartialEq for VarType {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (VarType::Primitive(a), VarType::Primitive(b)) => a == b,
+            (VarType::Array((type_a, dims_a)), VarType::Array((type_b, dims_b))) => {
+                type_a == type_b && dims_a.len() == dims_b.len()
+            },
+            (VarType::Struct(a), VarType::Struct(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for VarType {}

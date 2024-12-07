@@ -79,6 +79,13 @@ mod tests {
             assert_analyze_from_file(&in_path, &out_path);
         }
     }
+
+    #[test]
+    fn test_specific(){
+        let in_path = "../test/phase2/test_2_r14.spl";
+        let out_path = "../test/phase2/test_2_r14.out";
+        assert_analyze_from_file(in_path, out_path);
+    }
 }
 
 
