@@ -34,6 +34,7 @@ impl Walker {
 
     pub fn traverse(&mut self) {
         let program_clone = self.program.clone();
+        println!("===================================Traversing Programs===================================");
         self.traverse_program(&program_clone);
     }
 
@@ -102,15 +103,24 @@ impl Walker {
                         self.errors.add_error(err);
                     });
                 
+                //TODO: If error is reported, the dimensions calculation will be faulty. Test r12
+                let mut dim_vec: Vec<usize> = Vec::new();
                 match dim {
-                    Ok(dim) => match self.symbol_tables.validate_var_symbol(name, dim) {
-                        Ok(t) => Some(t),
-                        Err(err) => {
-                            self.errors.add_error(err);
-                            None
-                        }
+                    Ok(dim) => {
+                        dim_vec = dim;
+                    }
+                    Err(_) => {}
+                }
+                print!("Dimentions: {:?}\n", dim_vec);
+                match self.symbol_tables.validate_var_symbol(name, dim_vec) {
+                    Ok(t) => {
+                        println!("Variable Reference return type: {:?}", t);
+                        Some(t)
                     },
-                    Err(_) => None,
+                    Err(err) => {
+                        self.errors.add_error(err);
+                        None
+                    }
                 }
             }
             Variable::VarDeclaration(name, values, dimensions) => {
@@ -161,6 +171,7 @@ impl Walker {
             }
             Variable::VarAssignment(name, value, dimensions) => {
                 println!("VarAssignment: {:?}, Value: {:?}, Dimensions: {:?}", name, value, dimensions);
+                let val_type = self.traverse_comp_expr(value);
                 let dim = dimensions.iter()
                     .map(|comp_expr| {
                         if let Some(BasicType::Int) = self.traverse_comp_expr(comp_expr) {
@@ -178,16 +189,30 @@ impl Walker {
                         self.errors.add_error(err);
                     });
                 
-                    match dim {
-                        Ok(dim) => match self.symbol_tables.validate_var_symbol(name, dim) {
-                            Ok(t) => Some(t),
-                            Err(err) => {
-                                self.errors.add_error(err);
-                                None
+                match dim {
+                    Ok(dim) => match self.symbol_tables.validate_var_symbol(name, dim) {
+                        Ok(t) => {
+                            match val_type {
+                                Some(type_t) => {
+                                    match self.typer.check_var_type(t.clone()) {
+                                        Ok(basic_type) if basic_type == type_t => Some(t),
+                                        Ok(_) => None,
+                                        Err(err) => {
+                                            self.errors.add_error(err);
+                                            None
+                                        }
+                                    }
+                                },
+                                None => None
                             }
                         },
-                        Err(_) => None,
-                    }
+                        Err(err) => {
+                            self.errors.add_error(err);
+                            None
+                        }
+                    },
+                    Err(_) => None,
+                }
                 
             }
             
@@ -263,7 +288,14 @@ impl Walker {
                     .and_then(|(_, field_type)| {
                         match self.typer.check_var_type(field_type.clone()) {
                             Ok(vartype) if basic_type == vartype => Some(field_type.clone()),
-                            Ok(_) => None,
+                            Ok(_) => {
+                                self.errors.add_error(SemanticError::TypeError { 
+                                    id: 5, 
+                                    message: "Unmatched types appear at both sides of the assignment operator (=)".to_owned(), 
+                                    line: 0 
+                                });
+                                None
+                            },
                             Err(err) => {
                                 self.errors.add_error(SemanticError::NotImplementedFeatureError {
                                     message: "Not supported assignment to struct field".to_owned() 
@@ -307,7 +339,20 @@ impl Walker {
                         VarType::Primitive(symbol_type.clone())
                     }
                 };
-                return Some(var_type(&dimensions));
+
+                let new_symbol = self.manager.new_var_symbol(
+                    *name.clone(), 
+                    var_type(&dimensions), 
+                    false,
+                );
+
+                match self.symbol_tables.define_var_symbol(new_symbol) {
+                    Ok(()) => Some(var_type(&dimensions)),
+                    Err(err) => {
+                        self.errors.add_error(err);
+                        None
+                    }
+                }
             }
             Variable::Error => {
                 return None;
@@ -383,8 +428,11 @@ impl Walker {
                 for param in params {
                     if let Some(arg) = self.traverse_comp_expr(param) {
                         args.push(arg);
+                    }else{
+                        args.push(BasicType::Null)
                     }
                 }
+                // println!("-> Travesing functions arguments: {:?}", args);
                 let mut params: Vec<BasicType> = Vec::new();
                 let mut return_type: FuncType = (BasicType::Null, Vec::new());
                 match self.symbol_tables.get_func_symbol(name) {
@@ -410,6 +458,7 @@ impl Walker {
                     }
                     Err(err) => {
                         self.errors.add_error(err);
+                        return None;
                     }
                 }
                 match self.typer.check_func_params(params, args) {
@@ -434,9 +483,19 @@ impl Walker {
                         params.push(var_type);
                     }
                 }
-                self.manager.new_func_symbol(*name.clone(), (ret_type, params), true);
+                // println!("-> Declaring parameters: {:?}", self.symbol_tables.get_current_scope());
+                // println!("-> Travesing functions parameters: {:?}", params);
+                let func = self.manager.new_func_symbol(*name.clone(), (ret_type, params), true);
+                match self.symbol_tables.define_func_symbol(func) {
+                    Ok(()) => {}
+                    Err(err) => {
+                        self.errors.add_error(err);
+                        return None;
+                    }
+                }
 
                 self.traverse_body(body);
+
                 match self.symbol_tables.exit_scope() {
                     Ok(()) => {}
                     Err(err) => {

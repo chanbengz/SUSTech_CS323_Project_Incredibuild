@@ -1,0 +1,2 @@
+[Semantic Error] Invalid Operation Error[7] at line 0: "Unmatched operands, such as adding an integer to a structure variable"
+[Semantic Error] Type Mismatch Error[5] at line 0: "Unmatched types appear at both sides of the assignment operator (=)"

@@ -20,8 +20,8 @@ impl TypeChecker {
             return Ok(ltype);
         } else {
             return Err(SemanticError::ImproperUsageError {
-                id: 0,
-                message: "Type mismatch".to_string(),
+                id: 7,
+                message: "Unmatched operands, such as adding an integer to a structure variable".to_string(),
                 line: 0,
             });
         }
