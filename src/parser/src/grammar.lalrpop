@@ -93,20 +93,6 @@ VarDecs: Vec<tree::Variable> = {
         Some(e) => { v.push(e); v }
     },
     <e:VarDec> => vec![e],
-    <l:@L> ! <r:@R> => {
-        let error = ErrorRecovery {
-            error: ParseError::User {
-                error: LexicalError::StatementError(Span {
-                    source: source.to_string(),
-                    start: l,
-                    end: r
-                }, "Unexpected ','".to_string())
-            },
-            dropped_tokens: Vec::new(),
-        };
-        errors.push(error);
-        Vec::new()
-    }
 }
 
 ParaDec: tree::Variable = {
@@ -354,20 +340,7 @@ Expr: tree::Expr = {
 }
 
 OpenExpr: tree::Expr = {
-    "if" "(" <l:@L> <cond:CondExpr?> <m:@L> <rb:")"?> <r:@R> <body:Expr> => {
-        if rb == None {
-            let error = ErrorRecovery {
-                error: ParseError::User {
-                    error: LexicalError::MissingLexeme(Span {
-                        source: source.to_string(),
-                        start: m,
-                        end: r
-                    }, "closing parenthesis ')'".to_string())
-                },
-                dropped_tokens: Vec::new(),
-            };
-            errors.push(error);
-        }
+    "if" "(" <l:@L> <cond:CondExpr?> ")" <body:Expr> => {
         let cond = match cond {
             Some(cond) => cond,
             None => {
@@ -391,20 +364,7 @@ OpenExpr: tree::Expr = {
         };
         tree::Expr::If(tree::If::IfExpr(cond, body))
     },
-    "if" "(" <cond:CondExpr> <l:@L> <rb:")"?> <r:@R> <body:CloseExpr> "else" <body_2:OpenExpr> => {
-        if rb == None {
-            let error = ErrorRecovery {
-                error: ParseError::User {
-                    error: LexicalError::MissingLexeme(Span {
-                        source: source.to_string(),
-                        start: l,
-                        end: r
-                    }, "closing parenthesis ')'".to_string())
-                },
-                dropped_tokens: Vec::new(),
-            };
-            errors.push(error);
-        }
+    "if" "(" <cond:CondExpr> <l:@L> <rb:")"> <r:@R> <body:CloseExpr> "else" <body_2:OpenExpr> => {
         let body = match body {
             tree::Expr::Body(body) => body,
             _ => tree::Body::Body(vec![body])
@@ -420,6 +380,88 @@ OpenExpr: tree::Expr = {
                 body_2
             )
         )
+    },
+
+    // if error Condition ) { ... }
+    "if" <l:@L> ! <r:@R> CondExpr ")" Expr => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(Span {
+                    source: source.to_string(),
+                    start: l,
+                    end: r
+                }, "opening parenthesis '('".to_string())
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        tree::Expr::Error
+    },
+
+    "if" "(" <l:@L> <cond:CondExpr?> <m:@L> ! <r:@R> Expr => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(Span {
+                    source: source.to_string(),
+                    start: m,
+                    end: r
+                }, "closing parenthesis ')'".to_string())
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        tree::Expr::Error
+    },
+
+    "if" <l:@L> ! <r:@R> <cond:CondExpr> ")" <body:CloseExpr> "else" <body_2:OpenExpr> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(Span {
+                    source: source.to_string(),
+                    start: l,
+                    end: r
+                }, "opening parenthesis '('".to_string())
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        tree::Expr::Error
+    },
+
+    "if" "(" <cond:CondExpr> <l:@L> ! <r:@R> <body:CloseExpr> "else" <body_2:OpenExpr> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(Span {
+                    source: source.to_string(),
+                    start: l,
+                    end: r
+                }, "closing parenthesis ')'".to_string())
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        tree::Expr::Error
+    },
+
+    // TODO:remove this
+    <l:@L> <error:!> <r:@R> => match &error.error {
+        ParseError::UnrecognizedToken { token, expected } => {
+            if token.1 == Token::KeywordElse {
+                let error = ErrorRecovery {
+                    error: ParseError::User {
+                        error: LexicalError::StatementError(Span {
+                            source: source.to_string(),
+                            start: l,
+                            end: r
+                        }, "no 'if' before 'else'".to_string())
+                    },
+                    dropped_tokens: Vec::new(),
+                };
+                errors.push(error);
+            }
+            tree::Expr::Error
+        },
+        _ => tree::Expr::Error
     },
 }
 
@@ -527,6 +569,20 @@ CloseExpr: tree::Expr = {
 }
 
 WhileExpr: tree::Expr = {
+    "while" <l:@L> ! <r:@R> CondExpr ")" "{" Body "}" => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(Span {
+                    source: source.to_string(),
+                    start: l,
+                    end: r
+                }, "opening parenthesis '('".to_string())
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        tree::Expr::Error
+    },
     "while" "(" <cond:CondExpr> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> "}" => {
         if rb == None {
             let error = ErrorRecovery {
@@ -948,6 +1004,20 @@ Specifier: tree::Value = {
 
 Term: Box<tree::CompExpr> = {
     "(" <CompExpr> ")",
+    "(" <e:CompExpr> <l:@L> ! <r:@R> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(Span {
+                    source: source.to_string(),
+                    start: l,
+                    end: r
+                }, "closing parenthesis ')'".to_string())
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        Box::new(tree::CompExpr::MissingRP)
+    },
     <n: Identifier> <dims:DimDecs?> => {
         match dims {
             Some(dims) => Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(n), Box::new(dims)))),

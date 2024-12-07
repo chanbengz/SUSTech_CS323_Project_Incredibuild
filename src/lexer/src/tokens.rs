@@ -313,7 +313,7 @@ impl fmt::Display for LexicalError {
                 let mut input = String::new();
                 File::open(&span.source).expect("File not found").read_to_string(&mut input).expect("Error reading file");
                 let lineno = input[..span.start].lines().count();
-                write!(f, "Error type A at Line {}: unknown lexeme {}",
+                write!(f, "Error type A at Line {}: Unknown lexeme {}",
                     lineno, input[span.start..span.end].to_string().to_owned())
             },
             LexicalError::StatementError(span, msg) => {

@@ -13,7 +13,7 @@ impl EmitError for LexicalError {
         let mut input = String::new();
         let (span, error_msg) = match self {
             LexicalError::UnknownLexeme(span) => {
-                (span, format!("{} unknown lexeme [{}]", "error:".red(), "A".red()))
+                (span, format!("{} Unknown lexeme [{}]", "error:".red(), "A".red()))
             },
             LexicalError::MissingLexeme(span, token) => {
                 (span, format!("{} missing {} [{}]", "error:".red(), token.as_str(), "B".red()))
