@@ -25,33 +25,46 @@ C-like Compiler in Rust
 
 ```
 .
-|-- Cargo.toml # Add your sub-project in the [workspace] members field.
-|-- Dockerfile
-|-- LICENSE
-|-- README.md
-|-- docs
-|   |-- cs323-project-tutorial1.pdf
-|   |-- cs323-project-tutorial2.pdf
-│   |-- cs323-project-tutorial3.pdf
-│   |-- midterm-project-check.pdf
-|   |-- syntax.txt
-|   `-- token.txt
-`-- src
-    |-- ast
-    |   |-- Cargo.toml # Define your dependencies in the sub-project
-    |   `-- src # In lib.rs please pub mod all the crates.
-    |-- lexer
-    |   |-- Cargo.toml
-    |   `-- src
-    |-- main.rs
-    |-- parser
-    |   |-- Cargo.toml # When including your mod please add relevant path
-    |   |-- build.rs # lalrpop parser generator
-    |   `-- src
-    `-- test
-        |-- phase1
-        |-- phase2
-        `-- phase3
+├── Cargo.toml # Add your sub-project in the [workspace] members field.
+├── Dockerfile
+├── docs
+│   ├── cs323-project-tutorial1.pdf
+│   ├── cs323-project-tutorial2.pdf
+│   ├── cs323-project-tutorial3.pdf
+│   ├── midterm-project-check.pdf
+│   ├── syntax.txt
+│   └── token.txt
+├── LICENSE
+├── README.md
+├── src
+│   ├── analyser
+│   │   ├── Cargo.toml
+│   │   └── src
+│   ├── ast
+│   │   ├── Cargo.toml # Define your dependencies in the sub-project
+│   │   └── src # In lib.rs please pub mod all the crates.
+│   ├── lexer
+│   │   ├── Cargo.lock
+│   │   ├── Cargo.toml
+│   │   └── src
+│   ├── main.rs
+│   ├── parser
+│   │   ├── build.rs # lalrpop parser generator
+│   │   ├── Cargo.toml # When including your mod please add relevant path
+│   │   └── src
+│   └── test
+│       ├── phase1
+│       ├── phase2
+│       ├── phase3
+│       ├── test_0_r00.out
+│       └── test_0_r00.spl
+└── target
+    ├── CACHEDIR.TAG
+    └── debug
+        ├── build
+        ├── deps
+        ├── examples
+        └── incremental
 ```
 
 ## Testing
