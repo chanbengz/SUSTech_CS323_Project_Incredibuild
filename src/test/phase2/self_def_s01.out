@@ -1,0 +1,2 @@
+[Semantic Error] Invalid Operation Error[5] at line 6: "Assigning a value of type Primitive: type: Int to a variable of type Primitive: type: Float"
+[Semantic Error] Type Mismatch Error[8] at line 9: "The return type of the function should be Int, but get Float"

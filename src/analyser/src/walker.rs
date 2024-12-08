@@ -1,12 +1,17 @@
 use spl_ast::tree::*;
+use std::fs::File;
+use std::io::Read;
+use spl_parser::parse;
 use crate::manager::SymbolManager;
 use crate::error::{SemanticError, SemanticErrorManager};
 use crate::symbol::*;
 use crate::stack::ScopeStack;
 use crate::typer::{TypeChecker, ScopeType};
+use spl_lexer::tokens::Span;
 
 pub struct Walker {
     pub program: Program,
+    pub program_source: String,
     pub symbol_tables: ScopeStack,
     pub manager: SymbolManager,
     pub errors: SemanticErrorManager,
@@ -14,10 +19,17 @@ pub struct Walker {
 }
 
 impl Walker {
-    pub fn new(program: Program, manager: SymbolManager) -> Walker {
+    pub fn new(program_source: &str) -> Walker {
+        let mut src_content = String::new();
+        let mut src_file = File::open(program_source).expect("Unable to open file");
+        src_file.read_to_string(&mut src_content).expect("Unable to read file");
+
+        let ast = parse(&src_content).unwrap();
+
         Walker {
-            program: program,
-            manager: manager,
+            program: ast,
+            program_source: src_content,
+            manager: SymbolManager::default(),
             errors: SemanticErrorManager::new(),
             symbol_tables: ScopeStack::new(),
             typer: TypeChecker::new()
@@ -32,6 +44,25 @@ impl Walker {
         self.errors.get_errors()
     }
 
+    pub fn update_line(&mut self) {
+        self.errors.update_line();
+    }
+
+    pub fn update_line_with_span(&mut self, span: &Span) {
+        let lineno = self.program_source[..span.start].lines().count();
+        self.errors.update_line_with_value(lineno);
+        // let lineno = if lineno == 0 { 1.to_string() } else { lineno.to_string() };
+        // let begin = self.program_source[..span.start].rfind('\n').unwrap_or(0);
+        // let line_str = self.program_source.lines().nth(lineno.parse::<usize>().unwrap() - 1).unwrap();
+        // let padding = " ".repeat(lineno.len() + 1);
+        // let padding_msg = " ".repeat(span.start - begin);
+        // let bar = "|".purple();
+        // let mut indicator = "^".to_string();
+        // indicator.push_str(&"~".repeat(span.end - span.start - 1));
+        // println!("{} {}:{lineno}:{}: {error_msg}\n{padding}{}\n{} {} {line_str}\n{padding}{}{padding_msg}{}",
+        //          "-->".purple(), span.source, span.start, &bar, lineno.purple(), &bar, bar, indicator.red());
+    }
+
     pub fn traverse(&mut self) {
         let program_clone = self.program.clone();
         println!("===================================Traversing Programs===================================");
@@ -42,6 +73,7 @@ impl Walker {
         match program {
             Program::Program(parts) => {
                 println!("Program");
+                self.update_line();
                 for part in parts {
                     self.traverse_program_part(part);
                 }
@@ -67,15 +99,20 @@ impl Walker {
 
     fn traverse_statement(&mut self, statement: &Statement) {
         match statement {
-            Statement::Include(include) => println!("Include: {:?}", include),
-            Statement::GlobalVariable(vars) => {
+            Statement::Include(include, span) => {
+                println!("Include: {:?}", include);
+                self.update_line_with_span(span);
+            },
+            Statement::GlobalVariable(vars, span) => {
                 println!("Global Variables");
+                self.update_line_with_span(span);
                 for var in vars {
                     self.traverse_variable(var);
                 }
             }
-            Statement::Struct(var) => {
+            Statement::Struct(var, span) => {
                 println!("Struct");
+                self.update_line_with_span(span);
                 self.traverse_variable(var);
             }
             Statement::Error => println!("Error in Statements.")
@@ -90,9 +127,9 @@ impl Walker {
         let dim = dimensions.iter()
             .map(|comp_expr| {
                 match comp_expr {
-                    CompExpr::Value(Value::Int(value)) => Ok(*value as usize),
+                    CompExpr::Value(Value::Integer(value)) => Ok(*value as usize),
                     _ => {
-                        if let Some(BasicType::Int) = self.traverse_comp_expr(&comp_expr) {
+                        if let Some(VarType::Primitive(BasicType::Int)) = self.traverse_comp_expr(&comp_expr) {
                             Ok(0_usize)
                         } else {
                             Err(SemanticError::ImproperUsageError {
@@ -107,7 +144,8 @@ impl Walker {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|err| {
                 self.errors.add_error(err);
-            });
+            })
+            .ok()?;
 
         if dim.len() != dimensions.len() {
             self.errors.add_error(SemanticError::ImproperUsageError {
@@ -117,7 +155,7 @@ impl Walker {
             });
             None
         }else{
-            Some(dim.ok()?)
+            Some(dim)
         }
     }
     
@@ -125,50 +163,36 @@ impl Walker {
         match variable {
             Variable::VarReference(name, dimensions) => {
                 println!("VarReference: {:?}, Dimensions: {:?}", name, dimensions);
-                let dim = self.handle_dimensions(dimensions.clone())?;
+                let dim = self.handle_dimensions(*dimensions.clone())?;
                 let symbol = self.symbol_tables.get_var_symbol(name).map_err(|err| {
                     self.errors.add_error(err);
                 }).ok()?;
 
-                match symbol.symbol_type {
-                    VarType::Array(var_def) => {
-                        if !dim.is_empty() {
-                            let (type_t, size_t) = self.typer.check_array_type(var_def.clone(), dim).map_err(|err| {
-                                self.errors.add_error(err);
-                            }).ok()?;
-                            Some(symbol.symbol_type.clone())
-                        }else {
-
-                        }
-                    },
-                    _ => Some(symbol.symbol_type.clone()),
-                }
+                let var_type = self.typer.check_type(symbol.symbol_type.clone(), dim).map_err(|err| {
+                    self.errors.add_error(err);
+                }).ok()?;
+                Some(var_type)
             }
             
             Variable::VarDeclaration(name, values, dimensions) => {
                 println!("VarDeclaration: {:?}, Values: {:?}, Dimensions: {:?}", name, values, dimensions);
-                let dim = self.handle_dimensions(dimensions)?;
+                let dim = self.handle_dimensions(*dimensions.clone())?;
 
                 let symbol_type = BasicType::from(*values.clone());
-                let var_type: Option<VarType> = match dim {
-                    Ok(dim) => {
-                        if dim.len() > 0 {
-                            Some(VarType::Array((symbol_type, dim)))
-                        } else {
-                            Some(VarType::Primitive(symbol_type))
-                        }
-                    }
-                    Err(_) => None
-                };
+                let var_type = if dim.len() > 0 {
+                        VarType::Array((symbol_type, dim))
+                    } else {
+                        VarType::Primitive(symbol_type)
+                    };
 
                 let new_symbol = self.manager.new_var_symbol(
                     *name.clone(), 
-                    var_type.clone().unwrap(), 
+                    var_type.clone(), 
                     false,
                 );
 
                 match self.symbol_tables.define_var_symbol(new_symbol) {
-                    Ok(()) => Some(var_type.unwrap()),
+                    Ok(()) => Some(var_type),
                     Err(err) => {
                         self.errors.add_error(err);
                         None
@@ -179,61 +203,25 @@ impl Walker {
             Variable::VarAssignment(name, value, dimensions) => {
                 println!("VarAssignment: {:?}, Value: {:?}, Dimensions: {:?}", name, value, dimensions);
                 // Calculate the type of right hand side
-                let val_type = self.traverse_comp_expr(value).unwrap_or(BasicType::Null);
+                let right_type = self.traverse_comp_expr(value)?;
 
-                let dim = self.traverse_dimensions(dimensions).map_err(|err| {
-                    self.errors.add_error(err);
-                }).ok()?;
+                let dim = self.handle_dimensions(*dimensions.clone())?;
 
                 let symbol = self.symbol_tables.get_var_symbol(name).map_err(|err| {
                     self.errors.add_error(err);
                 }).ok()?;
 
-                match symbol.symbol_type {
-                    VarType::Array(var_def) => {
-                        match self.typer.check_array_type(var_def, dim) {
-                            Ok(basic_type) => {
-                                match self.typer.check_assign_operation(basic_type.0, val_type) {
-                                    Ok(b) => {
-                                        return Some(symbol.symbol_type.clone());
-                                    },
-                                    Err(err) => {
-                                        self.errors.add_error(err);
-                                        return None;
-                                    }
-                                }
-                            },
-                            Err(err) => {
-                                self.errors.add_error(err);
-                                return None;
-                            }
-                        }
-                    },
-                    VarType::Primitive(b) => {
-                        match self.typer.check_assign_operation(b, val_type) {
-                            Ok(b) => {
-                                return Some(symbol.symbol_type.clone());
-                            },
-                            Err(err) => {
-                                self.errors.add_error(err);
-                                return None;
-                            }
-                        }
-                    }
-                    VarType::Struct(_) => {
-                        self.errors.add_error(SemanticError::ImproperUsageError {
-                            id: 24,
-                            message: "Struct field assignment is not allowed".to_owned(),
-                            line: 0,
-                        });
-                        return None;
+                let left_type = self.typer.check_type(symbol.symbol_type.clone(), dim).map_err(|err| {
+                    self.errors.add_error(err);
+                }).ok()?;
+
+                match self.typer.check_assign_operation(left_type, right_type) {
+                    Ok(t) => Some(t),
+                    Err(err) => {
+                        self.errors.add_error(err);
+                        None
                     }
                 }
-            }
-            
-            Variable::StructReference(name) => {
-                println!("StructReference: {:?}", name);
-                return None;
             }
 
             // Define in the global scope
@@ -246,19 +234,17 @@ impl Walker {
                     }
                 }
                 match self.symbol_tables.define_struct((*name.clone(), vars)) {
-                    Ok(()) => {
-                        return None;
-                    }
+                    Ok(()) => None,
                     Err(err) => {
                         self.errors.add_error(err);
-                        return None;
+                        None
                     }
                 }
             }
             // Define a variable
             // First check if the struct exists
             // Then check if the variable is valid
-            Variable::StructDeclaration(obj_type, name, variables) => {
+            Variable::StructDeclaration(obj_type, name, _) => {
                 match self.symbol_tables.get_struct(obj_type) {
                     Ok(struct_type) => {
                         let new_symbol = self.manager.new_var_symbol(
@@ -283,65 +269,35 @@ impl Walker {
             // TODO: Define a variable
             // First check if the struct exists
             // Then check if the variable is valid
-            Variable::StructAssignment(name, field, value) => {
-                println!("StructAssignment: {:?}, Field: {:?}, Value: {:?}", name, field, value);
-                // First check if the variable exists
-                let var = self.symbol_tables.get_var_symbol(name).map_err(|err| {
+            Variable::StructAssignment(member, value) => {
+                println!("StructAssignment: Member: {:?} Value: {:?}", member, value);
+                // Check the type of the assigned value
+                let left_type = self.traverse_variable(&**member)?;
+                let right_type = self.traverse_comp_expr(&**value)?;
+                match self.typer.check_assign_operation(left_type, right_type) {
+                    Ok(t) => Some(t),
+                    Err(err) => {
+                        self.errors.add_error(err);
+                        None
+                    }
+                }
+            }
+            Variable::MemberReference(members) => {
+                println!("MemberReference: {:?}", members);
+                if members.is_empty() {
+                    return None;
+                }
+                
+                let mems: Vec<(String, String, Vec<usize>)> = members.clone().iter_mut().map(|(form_name, field_name, dimensions,)|{
+                    (*form_name.clone(), *field_name.clone(), self.handle_dimensions(*dimensions.clone()).unwrap_or(Vec::new()))
+                }).collect::<Vec<(String, String, Vec<usize>)>>();
+                
+                let symbol = self.symbol_tables.get_var_symbol(&mems[0].0).map_err(|err| {
                     self.errors.add_error(err);
                 }).ok()?;
-                // Then check if the variable is a struct
-                let fields = if let VarType::Struct((_, fields)) = var.symbol_type {
-                    fields
-                } else {
-                    self.errors.add_error(SemanticError::ImproperUsageError {
-                        id: 13,
-                        message: "Accessing members of a non-structure variable (i.e., misuse the dot operator)".to_owned(),
-                        line: 0,
-                    });
-                    return None;
-                };
-                // Check the type of the assigned value
-                let basic_type = self.traverse_comp_expr(&**value)?;
-                
-                fields.iter()
-                    .find(|(field_name, _)| field_name == &*field.clone())
-                    .and_then(|(_, field_type)| {
-                        match self.typer.check_var_type(field_type.clone()) {
-                            Ok(vartype) if basic_type == vartype => Some(field_type.clone()),
-                            Ok(_) => {
-                                self.errors.add_error(SemanticError::TypeError { 
-                                    id: 5, 
-                                    message: "Unmatched types appear at both sides of the assignment operator (=)".to_owned(), 
-                                    line: 0 
-                                });
-                                None
-                            },
-                            Err(err) => {
-                                self.errors.add_error(SemanticError::NotImplementedFeatureError {
-                                    message: "Not supported assignment to struct field".to_owned() 
-                                });
-                                None
-                            }
-                        }
-                    })
-            }
-            Variable::MemberReference(name, field) => {
-                match self.symbol_tables.get_var_symbol(name) {
-                    Ok(var) => {
-                        if let VarType::Struct((struct_name, fields)) = var.symbol_type {
-                            fields
-                                .iter()
-                                .find(|(field_name, _)| field_name == &*field.clone())
-                                .map(|(_, field_type)| field_type.clone())
-                        } else {
-                            self.errors.add_error(SemanticError::ImproperUsageError {
-                                id: 13,
-                                message: "Accessing members of a non-structure variable (i.e., misuse the dot operator)".to_owned(),
-                                line: 0,
-                            });
-                            None
-                        }
-                    }
+
+                match self.typer.check_member_reference(symbol.symbol_type.clone(), mems) {
+                    Ok(t) => Some(t),
                     Err(err) => {
                         self.errors.add_error(err);
                         None
@@ -374,38 +330,26 @@ impl Walker {
                     }
                 }
             }
-            Variable::Error => {
-                return None;
-            }
+            Variable::Error => None
         }
     }
 
     fn traverse_struct_field(&mut self, field: &Variable) -> Option<(String, VarType)> {
-        let mut vars: Vec<(String, VarType)> = Vec::new();
         match field {
             Variable::VarDeclaration(varname, type_t, offsets) => {
-                let dim = match self.traverse_dimensions(offsets.clone()) {
-                    Ok(dim) => dim,
-                    Err(err) => {
-                        self.errors.add_error(err);
-                        return None;
-                    }
-                };
-
+                let dim = self.handle_dimensions(*offsets.clone()).unwrap_or(Vec::new());
                 let symbol_type = BasicType::from(*type_t.clone());
                 let var: Option<(String, VarType)> = if dim.len() > 0 {
                     Some((*varname.clone(), VarType::Array((symbol_type, dim))))
                 } else {
                     Some((*varname.clone(), VarType::Primitive(symbol_type)))
                 };
-
                 var
             }
-            Variable::StructDeclaration(type_t, identifier, variables) => {
+            Variable::StructDeclaration(type_t, identifier, _) => {
                 match self.symbol_tables.get_struct(type_t) {
                     Ok(struct_type) => {
-                        let mut fields: Vec<(String, VarType)> = Vec::new();
-                        Some((*identifier.clone(), VarType::Struct((*type_t.clone(), fields))))
+                        Some((*identifier.clone(), VarType::Struct(struct_type.clone())))
                     }
                     Err(err) => {
                         self.errors.add_error(err);
@@ -413,17 +357,7 @@ impl Walker {
                     }
                 }
             }
-            Variable::VarAssignment(_, _, _) => {
-                self.errors.add_error(SemanticError::ImproperUsageError {
-                    id: 24,
-                    message: "Struct field assignment is not allowed".to_owned(),
-                    line: 0,
-                });
-                None
-            }
-            _ => {
-                None
-            }
+            _ => None
         }
     }
 
@@ -431,46 +365,21 @@ impl Walker {
         match function {
             Function::FuncReference(name, params) => {
                 println!("FuncReference: {:?}, Params: {:?}", name, params);
-                let mut args: Vec<BasicType> = Vec::new();
+                let mut args: Vec<VarType> = Vec::new();
                 for param in params {
                     if let Some(arg) = self.traverse_comp_expr(param) {
                         args.push(arg);
                     }else{
-                        args.push(BasicType::Null)
+                        args.push(VarType::Primitive(BasicType::Null));
                     }
                 }
                 // println!("-> Travesing functions arguments: {:?}", args);
-                let mut params: Vec<BasicType> = Vec::new();
-                let mut return_type: FuncType = (BasicType::Null, Vec::new());
-                match self.symbol_tables.get_func_symbol(name) {
-                    Ok(func_symbol) =>{
-                        func_symbol.symbol_type.1.iter().for_each(
-                            |t| {
-                                match t {
-                                    VarType::Primitive(basic_t) => {
-                                        params.push(*basic_t);
-                                    }
-                                    VarType::Array((basic_t, _)) => {
-                                        params.push(*basic_t);
-                                    }
-                                    VarType::Struct((_, _)) => {
-                                        self.errors.add_error(SemanticError::NotImplementedFeatureError {
-                                            message: "No struct type as function parameter".to_owned(),
-                                        });
-                                    }
-                                }
-                            }
-                        );
-                        return_type = func_symbol.symbol_type;
-                    }
-                    Err(err) => {
-                        self.errors.add_error(err);
-                        return None;
-                    }
-                }
-                match self.typer.check_func_params(params, args) {
+                let func_symbol = self.symbol_tables.get_func_symbol(name).map_err(|err| {
+                    self.errors.add_error(err);
+                }).ok()?;
+                match self.typer.check_func_params(func_symbol.symbol_type.clone().1, args) {
                     Ok(()) => {
-                        return Some(return_type);
+                        return Some(func_symbol.symbol_type.clone());
                     }
                     Err(err) => {
                         self.errors.add_error(err);
@@ -539,26 +448,31 @@ impl Walker {
 
     fn traverse_expr(&mut self, expr: &Expr) {
         match expr {
-            Expr::If(if_expr) => {
+            Expr::If(if_expr, span) => {
                 println!("If Expression");
+                self.update_line_with_span(span);
                 self.traverse_if(if_expr);
             }
-            Expr::Loop(loop_expr) => {
+            Expr::Loop(loop_expr, span) => {
                 println!("Loop Expression");
+                self.update_line_with_span(span);
                 self.traverse_loop(loop_expr);
             }
-            Expr::VarManagement(vars) => {
+            Expr::VarManagement(vars, span) => {
                 println!("VarManagement");
+                self.update_line_with_span(span);
                 for var in vars {
                     self.traverse_variable(var);
                 }
             }
-            Expr::FuncCall(function) => {
+            Expr::FuncCall(function, span) => {
                 println!("Function Call");
+                self.update_line_with_span(span);
                 self.traverse_function(function);
             }
-            Expr::Break => {
+            Expr::Break(span) => {
                 println!("Break");
+                self.update_line_with_span(span);
                 if self.typer.get_scope() != ScopeType::LoopExpr{
                     self.errors.add_error(SemanticError::ImproperUsageError { 
                         id: 17, 
@@ -567,8 +481,9 @@ impl Walker {
                     });
                 }
             },
-            Expr::Continue => {
+            Expr::Continue(span) => {
                 println!("Continue");
+                self.update_line_with_span(span);
                 if self.typer.get_scope() != ScopeType::LoopExpr{
                     self.errors.add_error(SemanticError::ImproperUsageError { 
                         id: 17, 
@@ -577,19 +492,25 @@ impl Walker {
                     });
                 }
             },
-            Expr::Return(comp_expr) => {
+            Expr::Return(comp_expr, span) => {
                 println!("Return");
+                self.update_line_with_span(span);
                 match self.traverse_comp_expr(comp_expr) {
                     Some(t) => {
-                        if let Err(err) = self.typer.check_ret_type(t) {
+                        let b = match t{
+                            VarType::Primitive(b) => b,
+                            _ => BasicType::Null
+                        };
+                        if let Err(err) = self.typer.check_ret_type(b) {
                             self.errors.add_error(err);
                         }
                     }
                     None => {}
                 }
             }
-            Expr::Body(body) => {
+            Expr::Body(body, span) => {
                 println!("Body");
+                self.update_line_with_span(span);
                 self.traverse_body(body);
             }
             Expr::Error => println!("Error in Expression"),
@@ -639,57 +560,38 @@ impl Walker {
 
     fn traverse_cond_expr(&mut self, cond: &CondExpr) -> Option<BasicType> {
         match cond {
-            CondExpr::Bool(value) => {
+            CondExpr::Bool(_) => {
                 return Some(BasicType::Bool)
             },
             CondExpr::UnaryCondition(op, expr) => {
                 println!("UnaryCondition: {:?}", op);
-                match self.traverse_cond_expr(expr) {
-                    Some(t) => {
-                        return Some(t);
-                    }
-                    None => {
+                self.traverse_cond_expr(expr)
+            }
+            CondExpr::BinaryCondition(lhs, op, rhs) => {
+                println!("BinaryCondition: {:?} {:?} {:?}", lhs, op, rhs);
+                let left_type = self.traverse_cond_expr(lhs)?;
+                let right_type = self.traverse_cond_expr(rhs)?;
+                match self.typer.check_binary_operations(VarType::Primitive(left_type), VarType::Primitive(right_type)) {
+                    Ok(_) => Some(BasicType::Bool),
+                    Err(err) => {
+                        self.errors.add_error(err);
                         return None;
                     }
                 }
             }
-            CondExpr::BinaryCondition(lhs, op, rhs) => {
-                println!("BinaryCondition: {:?} {:?} {:?}", lhs, op, rhs);
-                if let Some(lhs_type) = self.traverse_cond_expr(lhs) {
-                    if let Some(rhs_type) = self.traverse_cond_expr(rhs) {
-                        match self.typer.check_binary_condition(lhs_type, rhs_type) {
-                            Ok(t) => {
-                                return Some(t);
-                            }
-                            Err(err) => {
-                                self.errors.add_error(err);
-                                return None;
-                            }
-                        }
-                    }
-                }
-                return None;
-            }
             CondExpr::Condition(lhs, op, rhs) => {
                 println!("Condition: {:?} {:?} {:?}", lhs, op, rhs);
-                if let Some(lhs_type) = self.traverse_comp_expr(lhs) {
-                    if let Some(rhs_type) = self.traverse_comp_expr(rhs) {
-                        match self.typer.check_condition(lhs_type, rhs_type) {
-                            Ok(t) => {
-                                return Some(t);
-                            }
-                            Err(err) => {
-                                self.errors.add_error(err);
-                                return None;
-                            }
-                        }
+                let left_type = self.traverse_comp_expr(lhs)?;
+                let right_type = self.traverse_comp_expr(rhs)?;
+                match self.typer.check_condition(left_type, right_type) {
+                    Ok(t) => Some(t),
+                    Err(err) => {
+                        self.errors.add_error(err);
+                        return None;
                     }
                 }
-                return None;
             }
-            CondExpr::Error => {
-                return None;
-            },
+            CondExpr::Error => None
         }
     }
 
@@ -697,71 +599,45 @@ impl Walker {
         match comp {
             CompExpr::Value(value) => {
                 println!("Value: {:?}", value);
-                return Some(BasicType::from(value.clone()));
+                return Some(VarType::Primitive(BasicType::from(value.clone())));
             },
             CompExpr::Variable(variable) => {
                 println!("Variable: {:?}", variable);
-                if let Some(var_type) = self.traverse_variable(variable) {
-                    match self.typer.check_var_type(var_type) {
-                        Ok(t) => {
-                            return Some(t);
-                        }
-                        Err(err) => {
-                            self.errors.add_error(err);
-                            return None;
-                        }
-                    }
-                } else {
-                    return None;
-                }
+                return self.traverse_variable(variable);
             }
             CompExpr::FuncCall(function) => {
                 println!("Function Call");
-                match self.traverse_function(function) {
-                    Some((return_type, _)) => {
-                       return Some(return_type);
-                    }
-                    None => {
-                        return None;
-                    }
-                }
+                let func_type = self.traverse_function(function)?;
+                return Some(VarType::Primitive(func_type.0));
             }
             CompExpr::UnaryOperation(op, expr) => {
                 println!("UnaryOperation: {:?}", op);
-                match self.traverse_comp_expr(expr) {
-                    Some(t) => {
-                        return Some(t);
-                    }
-                    None => {
-                        return None;
-                    }
+                let expr_type = self.traverse_comp_expr(expr)?;
+                if let VarType::Primitive(BasicType::Bool) = expr_type {
+                    Some(VarType::Primitive(BasicType::Bool))
+                } else {
+                    self.errors.add_error(SemanticError::TypeError {
+                        id: 20,
+                        message: "Unary '!' operator requires boolean operand".to_owned(),
+                        line: 0,
+                    });
+                    None
                 }
             }
             CompExpr::BinaryOperation(lhs, op, rhs) => {
                 println!("BinaryOperation: {:?} {:?} {:?}", lhs, op, rhs);
-                if let Some(lhs_type) = self.traverse_comp_expr(lhs) {
-                    if let Some(rhs_type) = self.traverse_comp_expr(rhs) {
-                        match self.typer.check_binary_operations(lhs_type, rhs_type) {
-                            Ok(t) => {
-                                return Some(t);
-                            }
-                            Err(err) => {
-                                self.errors.add_error(err);
-                                return None;
-                            }
-                        }
+                let left_type = self.traverse_comp_expr(lhs)?;
+                let right_type = self.traverse_comp_expr(rhs)?;
+                match self.typer.check_binary_operations(left_type, right_type) {
+                    Ok(t) => Some(t),
+                    Err(err) => {
+                        self.errors.add_error(err);
+                        return None;
                     }
                 }
-                return None;
             }
-            CompExpr::Error => {
-                return None;
-            }
-            CompExpr::Invalid => {
-                return None;
-            }
-            CompExpr::MissingRP => {
-                return None;
+            CompExpr::Error | CompExpr::Invalid | CompExpr::MissingRP => {
+                None
             }
         }
     }

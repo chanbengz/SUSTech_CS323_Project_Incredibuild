@@ -1,0 +1,2 @@
+[Semantic Error] Redefinition Error[15] at line 9: "Apple" redefined.
+[Semantic Error] Invalid Operation Error[5] at line 16: "Assigning a value of type Primitive: type: Int to a variable of type Primitive: type: Float"

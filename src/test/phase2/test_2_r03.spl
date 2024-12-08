@@ -3,7 +3,7 @@ struct Student
     int weight;
     float weight;
 };
-int test_2_r07()
+int test_2_r03()
 {
     struct Student amy;
     int age;

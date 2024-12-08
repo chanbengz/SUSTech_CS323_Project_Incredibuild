@@ -3,7 +3,7 @@ struct Apple
   int weight;
   float round;
 };
-int test_2_r05()
+int test_2_r06()
 {
   struct Apple aa;
   aa.weight = 2.5;

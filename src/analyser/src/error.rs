@@ -1,6 +1,4 @@
 use thiserror::Error;
-use std::fmt;
-pub use SemanticError::*;
 
 #[derive(Clone, Error, Debug)]
 pub enum SemanticError {
@@ -34,24 +32,20 @@ pub enum SemanticError {
         message: String,
         line: usize,
     },
-    #[error("[Semantic Error] Not Implemented Feature Error: {message:?}")]
+    #[error("[Semantic Error] Not Implemented Feature Error at line {line:?}: {message:?}")]
     NotImplementedFeatureError{
         message: String,
+        line: usize
     },
 	#[error("System error: {0}")]
 	SystemError(String),
 
 }
 
-pub type Result<T, E = SemanticError> = core::result::Result<T, E>;
-
-pub fn map_sys_err(e: std::io::Error) -> SemanticError {
-	SystemError(e.to_string())
-}
-
 pub struct SemanticErrorManager {
     cnt: usize,
     errors: Vec<SemanticError>,
+    line: usize,
 }
 
 impl SemanticErrorManager {
@@ -59,11 +53,13 @@ impl SemanticErrorManager {
         SemanticErrorManager {
             cnt: 0,
             errors: Vec::new(),
+            line: 0,
         }
     }
 
-    pub fn add_error(&mut self, error: SemanticError) {
+    pub fn add_error(&mut self, mut error: SemanticError) {
         self.cnt += 1;
+        error.update_line(self.line);
         self.errors.push(error);
     }
 
@@ -73,5 +69,27 @@ impl SemanticErrorManager {
 
     pub fn has_error(&self) -> bool {
         !self.errors.is_empty()
+    }
+
+    pub fn update_line(&mut self) {
+        self.line += 1;
+    }
+
+    pub fn update_line_with_value(&mut self, value: usize) {
+        self.line = value;
+    }
+}
+
+impl SemanticError {
+    fn update_line(&mut self, line: usize) {
+        match self {
+            SemanticError::TypeError{line: ref mut l, ..} => *l = line,
+            SemanticError::ReferenceError{line: ref mut l, ..} => *l = line,
+            SemanticError::RedefinitionError{line: ref mut l, ..} => *l = line,
+            SemanticError::ImproperUsageError{line: ref mut l, ..} => *l = line,
+            SemanticError::ScopeError{line: ref mut l, ..} => *l = line,
+            SemanticError::NotImplementedFeatureError{line: ref mut l, ..} => *l = line,
+            _ => {}
+        }
     }
 }

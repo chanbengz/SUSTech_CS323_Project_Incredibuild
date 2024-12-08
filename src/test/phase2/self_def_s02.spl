@@ -1,0 +1,14 @@
+struct Apple
+{
+  int weight;
+  float round;
+  float price;
+};
+int self_def_s02(){
+    struct Apple a = {
+        .weight : 3.0, 
+        .round : 4
+    };
+    a.price = 2.0;
+    return 0;
+}

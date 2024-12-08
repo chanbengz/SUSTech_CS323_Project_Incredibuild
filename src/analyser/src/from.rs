@@ -1,9 +1,5 @@
-use std::borrow::Borrow;
-
-use spl_ast::tree::{Value, Variable, CompExpr};
-use crate::manager::SymbolManager;
+use spl_ast::tree::Value;
 use crate::symbol::*;
-use crate::error::SemanticError;
 use crate::typer::FuncRetType;
 
 impl From<Value> for BasicType {

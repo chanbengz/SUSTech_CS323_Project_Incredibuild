@@ -1,0 +1,17 @@
+struct Test 
+{
+    int a[3];
+};
+struct Apple 
+{
+    int a[2][3];
+    struct Test b;
+};
+int self_def_s03() 
+{
+    int b[2];
+    struct Apple app;
+    app.a[0][2] = b;
+    app.b.a = 3.0;
+    return 0;
+}

@@ -1,1 +1,1 @@
-[Semantic Error] Type Mismatch Error[8] at line 0: "A function’s return value type mismatches the declared type"
+[Semantic Error] Type Mismatch Error[8] at line 19: "The return type of the function should be Int, but get Float"

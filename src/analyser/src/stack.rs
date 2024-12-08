@@ -1,6 +1,5 @@
 use crate::table::ScopeTable;
-use crate::symbol::{VarSymbol, FuncSymbol, VarType, StructType};
-use std::process::id;
+use crate::symbol::{VarSymbol, FuncSymbol, StructType};
 use std::rc::Rc;
 use std::cell::RefCell;
 use crate::error::SemanticError;
