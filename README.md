@@ -11,9 +11,9 @@ C-like Compiler in Rust
 
 ## Features
 
-- [ ] SPL Grammar:
-    - [ ] Lexer & Parser
-    - [ ] Semantic Analyzer
+- [x] SPL Grammar:
+    - [x] Lexer & Parser
+    - [x] Semantic Analyzer
     - [ ] Macro
 - [ ] LLVM IR Generation
 - [ ] Optimization
