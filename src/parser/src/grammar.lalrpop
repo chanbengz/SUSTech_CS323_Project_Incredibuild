@@ -380,7 +380,21 @@ OpenExpr: tree::Expr = {
             )
         )
     },
-
+    // if ( error ) { ... }
+    "if" "(" <l:@L> <cond:CompExpr> ")" <body:Expr> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::StatementError(Span {
+                    source: source.to_string(),
+                    start: l - 1,
+                    end: l + 1
+                }, "Must be condition".to_string())
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        tree::Expr::Error
+    },
     // if error Condition ) { ... }
     "if" <l:@L> ! <r:@R> CondExpr ")" Expr => {
         let error = ErrorRecovery {
