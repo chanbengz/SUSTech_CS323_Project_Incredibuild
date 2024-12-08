@@ -1,5 +1,4 @@
 use std::fmt;
-use std::fmt::format;
 
 use crate::{error::SemanticError, symbol::{VarType, BasicType}};
 
