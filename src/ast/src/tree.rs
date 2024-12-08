@@ -1,3 +1,5 @@
+use spl_lexer::tokens::Span;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Program{
     Program(Vec<ProgramPart>),
@@ -14,9 +16,9 @@ pub enum ProgramPart {
 pub enum Statement { 
     // Statement includes Macro, however, macro 
     // requires special management.
-    Include(Box<String>), 
-    GlobalVariable(Vec<Variable>),
-    Struct(Variable),
+    Include(Box<String>, Span), 
+    GlobalVariable(Vec<Variable>, Span),
+    Struct(Variable, Span),
     Error
 }
 
@@ -30,14 +32,13 @@ pub enum Variable {
     VarDeclaration(Box<String>, Box<Value>, Box<Vec<CompExpr>>), // varname, type, offsets
     VarAssignment(Box<String>, Box<CompExpr>, Box<Vec<CompExpr>>), // varname, expr, offsets
 
-    // Struct is defined to realize object.
+    // Struct definition and declaration
     StructDefinition(Box<String>, Box<Vec<Variable>>),
-    // Object type, Identifier, Variables
     StructDeclaration(Box<String>, Box<String>, Box<Vec<Variable>>),
-    // Identifier, Field, Variable
     StructAssignment(Box<Variable>, Box<CompExpr>),
-
     MemberReference(Vec<(Box<String>, Box<String>, Box<Vec<CompExpr>>)>),
+
+    // Function Parameter
     FormalParameter(Box<String>, Box<Value>, Box<Vec<usize>>),
     Error
 }
@@ -139,13 +140,13 @@ pub enum Body {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr{
-    If(If),
-    Loop(Loop),
-    VarManagement(Vec<Variable>),
-    FuncCall(Function),
-    Body(Body),
-    Break,
-    Continue,
-    Return(CompExpr),
+    If(If, Span),
+    Loop(Loop, Span),
+    VarManagement(Vec<Variable>, Span),
+    FuncCall(Function, Span),
+    Body(Body, Span),
+    Break(Span),
+    Continue(Span),
+    Return(CompExpr, Span),
     Error
 }

@@ -1,2 +1,2 @@
-[Semantic Error] Invalid Operation Error[7] at line 0: "Unmatched operands, such as adding an integer to a structure variable"
-[Semantic Error] Invalid Operation Error[22] at line 0: "Invalid use of struct in computation expression"
+[Semantic Error] Invalid Operation Error[7] at line 11: "Unmatched operands, conducting operations between Primitive: type: Int and Primitive: type: Float"
+[Semantic Error] Invalid Operation Error[7] at line 12: "Unmatched operands, conducting operations between Primitive: type: Float and Struct: (\"Apple\", [(\"weight\", Primitive(Int)), (\"round\", Primitive(Float))])"

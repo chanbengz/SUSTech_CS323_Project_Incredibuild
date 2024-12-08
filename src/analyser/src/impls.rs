@@ -1,6 +1,5 @@
 use crate::symbol::*;
 use crate::manager::SymbolManager;
-use crate::error::{SemanticError, SemanticErrorManager};
 
 impl<T> Symbol<T> {
     pub fn new(id: i32, is_global: bool, identifier: String, symbol_type: T) -> Symbol<T>{
@@ -59,25 +58,6 @@ impl VarSymbol {
         match &self.symbol_type {
             VarType::Struct((t, _)) => Some(t.clone()),
             _ => None,
-        }
-    }
-}
-
-// From for FuncSymbol
-impl FuncSymbol {
-    fn define(manager: &mut SymbolManager, identifier: String, return_type: BasicType, parameters: Vec<VarType>) -> FuncSymbol {
-        manager.new_func_symbol(identifier, (return_type, parameters), true)
-    }
-
-    fn get_return_type(&self) -> BasicType {
-        match &self.symbol_type {
-            (t, _) => t.clone(),
-        }
-    }
-
-    fn get_parameters(&self) -> Vec<VarType> {
-        match &self.symbol_type {
-            (_, p) => p.clone(),
         }
     }
 }

@@ -1,5 +1,5 @@
-[Semantic Error] Undefined Reference Error[1] at line 0: "z" undefined.
-[Semantic Error] Undefined Reference Error[1] at line 0: "a" undefined.
-[Semantic Error] Redefinition Error[3] at line 0: "b" redefined.
-[Semantic Error] Undefined Reference Error[1] at line 0: "a" undefined.
-[Semantic Error] Type Mismatch Error[10] at line 0: "The type of an argument passed to a function does not match the type of the corresponding parameter in the function definition"
+[Semantic Error] Undefined Reference Error[1] at line 3: "z" undefined.
+[Semantic Error] Undefined Reference Error[1] at line 9: "a" undefined.
+[Semantic Error] Redefinition Error[3] at line 10: "b" redefined.
+[Semantic Error] Undefined Reference Error[1] at line 10: "a" undefined.
+[Semantic Error] Type Mismatch Error[10] at line 10: "The type of the 1th argument does not match the type of the parameter. Expected Primitive: type: Int, but got Primitive: type: Null"

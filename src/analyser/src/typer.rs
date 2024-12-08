@@ -1,11 +1,13 @@
+use std::fmt;
+use std::fmt::format;
+
 use crate::{error::SemanticError, symbol::{VarType, BasicType}};
 
 
 pub struct TypeChecker{
     pub current_scope: ScopeType,
     pub current_type: BasicType,
-    pub func_ret_type: FuncRetType,
-    pub line: usize
+    pub func_ret_type: FuncRetType
 }
 
 impl TypeChecker {
@@ -13,60 +15,47 @@ impl TypeChecker {
         TypeChecker{
             current_scope: ScopeType::Global,
             current_type: BasicType::Null,
-            func_ret_type: FuncRetType::Null,
-            line: 0
+            func_ret_type: FuncRetType::Null
         }
     }
 
-    pub fn check_binary_operations(&self, ltype: BasicType, rtype: BasicType) -> Result<BasicType, SemanticError> {
+    pub fn check_binary_operations(&self, ltype: VarType, rtype: VarType) -> Result<VarType, SemanticError> {
         if ltype == rtype {
             return Ok(ltype);
         } else {
             return Err(SemanticError::ImproperUsageError {
                 id: 7,
-                message: "Unmatched operands, such as adding an integer to a structure variable".to_string(),
-                line: self.line,
+                message: format!("Unmatched operands, conducting operations between {} and {}", ltype, rtype),
+                line: 0,
             });
         }
     }
 
-    pub fn check_assign_operation(&self, ltype: BasicType, rtype: BasicType) -> Result<BasicType, SemanticError> {
+    pub fn check_assign_operation(&self, ltype: VarType, rtype: VarType) -> Result<VarType, SemanticError> {
         if ltype == rtype {
             return Ok(rtype);
         } else {
             return Err(SemanticError::ImproperUsageError {
                 id: 5,
-                message: "Unmatched types appear at both sides of the assignment operator (=)".to_string(),
-                line: self.line,
+                message: format!("Assigning a value of type {} to a variable of type {}", rtype, ltype),
+                line: 0,
             });
         }
     }
 
-    pub fn check_var_type(&self, var: VarType) -> Result<BasicType, SemanticError> {
-        match var {
-            VarType::Primitive(t) => Ok(t),
-            VarType::Array((t, _)) => Ok(t),
-            VarType::Struct(_) => Err(SemanticError::ImproperUsageError{
-                id: 22,
-                message: "Invalid use of struct in computation expression".to_owned(),
-                line: self.line
-            }),
-        }
-    }
-
-    pub fn check_condition(&self, ltype: BasicType, rtype: BasicType) -> Result<BasicType, SemanticError>{
+    pub fn check_condition(&self, ltype: VarType, rtype: VarType) -> Result<BasicType, SemanticError>{
         match (ltype, rtype) {
-            (BasicType::Int, BasicType::Int) => {
+            (VarType::Primitive(BasicType::Int), VarType::Primitive(BasicType::Int)) => {
                 Ok(BasicType::Bool)
             }
-            (BasicType::Float, BasicType::Float) => {
+            (VarType::Primitive(BasicType::Float), VarType::Primitive(BasicType::Float)) => {
                 Ok(BasicType::Bool)
             }
             _ => {
                 Err(SemanticError::TypeError{ 
                     id: 7, 
-                    message: "Unmatched operands, such as adding an integer to a structure variable".to_owned(), 
-                    line: self.line
+                    message: "Only type Int and type Float are supported in condition.".to_owned(), 
+                    line: 0
                 })
             }
         }
@@ -80,8 +69,8 @@ impl TypeChecker {
             _ => {
                 Err(SemanticError::TypeError{ 
                     id: 7, 
-                    message: "Unmatched operands, such as adding an integer to a structure variable".to_owned(), 
-                    line: self.line
+                    message: "Only type Bool is supported in binary condition.".to_owned(),
+                    line: 0
                 })
             }
         }
@@ -93,26 +82,26 @@ impl TypeChecker {
         } else {
             Err(SemanticError::TypeError{
                 id: 8,
-                message: "A function’s return value type mismatches the declared type".to_string(),
-                line: self.line
+                message: format!("The return type of the function should be {}, but get {}", self.func_ret_type, type_t),
+                line: 0
             })
         }
     }
 
-    pub fn check_func_params(&self, params: Vec<BasicType>, args: Vec<BasicType>) -> Result<(), SemanticError>{
+    pub fn check_func_params(&self, params: Vec<VarType>, args: Vec<VarType>) -> Result<(), SemanticError>{
         if params.len() != args.len() {
             return Err(SemanticError::TypeError{
                 id: 9,
-                message: "The number of arguments passed to a function does not match the number of parameters in the function definition".to_string(),
-                line: self.line
+                message: format!("The number of arguments passed to a function does not match the number of parameters in the function definition. Expected {} arguments, but got {}", params.len(), args.len()),
+                line: 0
             });
         }
         for i in 0..params.len() {
             if params[i] != args[i] {
                 return Err(SemanticError::TypeError{
                     id: 10,
-                    message: "The type of an argument passed to a function does not match the type of the corresponding parameter in the function definition".to_string(),
-                    line: self.line
+                    message: format!("The type of the {}th argument does not match the type of the parameter. Expected {}, but got {}", i+1, params[i], args[i]),
+                    line: 0
                 });
             }
         }
@@ -129,69 +118,87 @@ impl TypeChecker {
         }
         return Err(SemanticError::ImproperUsageError{
             id: 14,
-            message: "Accessing an undefined structure member".to_string(),
-            line: self.line
+            message: format!("Field {} is not defined in the struct.", field_name),
+            line: 0
         });
     }
 
     // This is used when doing member assignments.
-    // It is ensure that the member is defined in the struct.
-    pub fn check_member_reference(&self, var: Vec<(String, VarType)>, reference: Vec<(String, String, Vec<usize>)>) -> Result<(BasicType, usize), SemanticError>{
-        let mut var_def: Vec<String, VarType> = var;
-        reference.iter_mut().for_each(|(var_name, field_name, usize)| {
-            let mut found = false;
-            match self.check_struct_field(field_name, var_def) {
-                Ok(t) => {
-                    match t {
-                        VarType::Struct(s) => {
-                            var_def = s.1;
-                        },
-                        VarType::BasicType(b) => {
-                            return Ok((b, 0));
-                        },
-                        VarType::Array(a) => {
-                            match self.check_array_type(a, usize) {
-                                Ok((b, post_size)) => {
-                                    return Ok((b, post_size));
-                                },
-                                Err(e) => return Err(e)
-                            }
-                        }
-                    };
-                    found = true;
-                }
-                Err(e) => return Err(e)
-            }
-            if found == false {
-                return Err(SemanticError::ImproperUsageError{
-                    id: 14,
-                    message: "Accessing an undefined structure member".to_string(),
-                    line: self.line
-                });
-            }
-        });
-    }
-
-    // This is used to check the array offset.
-    pub fn check_array_type(&self, var: (BasicType, Vec<usize>), reference: Vec<usize>) -> Result<(BasicType, usize), SemanticError>{
-        if var.1.len() < reference.len() {
-            return Err(SemanticError::TypeError{
-                id: 10,
-                message: "Applying indexing operator ([…]) on non-array type variables".to_string(),
+    // var_type represents the type of the struct variable.
+    pub fn check_member_reference(&mut self, var_type: VarType, members: Vec<(String, String, Vec<usize>)>) -> Result<VarType, SemanticError> {
+        let mut current_type = var_type;
+        let mut struct_fields = match current_type {
+            VarType::Struct((_, ref fields)) => fields,
+            _ => return Err(SemanticError::ImproperUsageError{
+                id: 13,
+                message: "Accessing a member of a non-structure variable".to_string(),
                 line: 0
-            });
-        }
-        for i in 0..reference.len() {
-            if var.1[i] < reference.1[i] {
-                return Err(SemanticError::ImproperUsageError{
-                    id: 21,
-                    message: "Index out of bounds.".to_string(),
-                    line: 0
-                });
+            })
+        };
+        let mut members_count = members.len();
+        for (_, member_name, dim_indices) in members {
+
+            let field = self.check_struct_field(member_name, struct_fields.clone())?;
+            current_type = self.check_type(field, dim_indices)?;
+
+            if members_count == 0 {
+                return Ok(current_type);
             }
             
+            members_count -= 1;
+            match current_type {
+                VarType::Struct((_, ref fields)) => {
+                    struct_fields = fields;
+                }
+                _ => {
+                    if members_count != 0 {
+                        return Err(SemanticError::ImproperUsageError{
+                            id: 13,
+                            message: "Accessing a member of a non-structure variable".to_string(),
+                            line: 0
+                        });
+                    } else {
+                        return Ok(current_type);
+                    }
+                }
+            }
         }
-        return Ok((var.0, var.1.len() - reference.len()));
+        Ok(current_type)
+    }
+
+    // This is used to check the type (if it is an array) and the indices.
+    pub fn check_type(&self, var_type: VarType, reference: Vec<usize>) -> Result<VarType, SemanticError> {
+        match var_type {
+            VarType::Array((basic_type, dims)) => {
+                let num_indices = reference.len();
+                let num_dims = dims.len();
+
+                if num_indices > num_dims {
+                    return Err(SemanticError::ImproperUsageError{
+                        id: 20,
+                        message: format!("Expected to have {} indices, but got {}", num_dims, num_indices),
+                        line: 0
+                    });
+                } else if num_indices == num_dims {
+                    for i in 0..num_indices {
+                        if reference[i] >= dims[i] {
+                            return Err(SemanticError::ImproperUsageError{
+                                id: 21,
+                                message: format!("Index {} is out of bounds: {} > {}", i, reference[i], dims[i]),
+                                line: 0
+                            });
+                        }
+                    }
+                    return Ok(VarType::Primitive(basic_type));
+                } else {
+                    let remaining_dims = dims[num_indices..].to_vec();
+                    return Ok(VarType::Array((basic_type, remaining_dims)));
+                }
+            }
+            _ => {
+                return Ok(var_type);
+            }
+        }
     }
     
 
@@ -241,4 +248,18 @@ pub enum FuncRetType {
 	String,
 	Void,
     Null
+}
+
+impl fmt::Display for FuncRetType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            FuncRetType::Int => write!(f, "Int"),
+            FuncRetType::Char => write!(f, "Char"),
+            FuncRetType::Float => write!(f, "Float"),
+            FuncRetType::Bool => write!(f, "Bool"),
+            FuncRetType::String => write!(f, "String"),
+            FuncRetType::Void => write!(f, "Void"),
+            FuncRetType::Null => write!(f, "Null"),
+        }
+    }
 }

@@ -1,2 +1,2 @@
-[Semantic Error] Invalid Operation Error[7] at line 0: "Unmatched operands, such as adding an integer to a structure variable"
-[Semantic Error] Type Mismatch Error[5] at line 0: "Unmatched types appear at both sides of the assignment operator (=)"
+[Semantic Error] Invalid Operation Error[7] at line 11: "Unmatched operands, conducting operations between Primitive: type: Int and Primitive: type: Float"
+[Semantic Error] Invalid Operation Error[5] at line 12: "Assigning a value of type Primitive: type: Char to a variable of type Primitive: type: Float"

@@ -1,7 +1,1 @@
-[Semantic Error] Type Mismatch Error[23] at line 0: \"Dimension Mismatched\"\n
-[Semantic Error] Type Mismatch Error[23] at line 0: \"Dimension Mismatched\"\n
-[Semantic Error] Type Mismatch Error[23] at line 0: \"Dimension Mismatched\"\n
-[Semantic Error] Type Mismatch Error[23] at line 0: \"Dimension Mismatched\"\n
-[Semantic Error] Type Mismatch Error[23] at line 0: \"Dimension Mismatched\"\n
-[Semantic Error] Type Mismatch Error[23] at line 0: \"Dimension Mismatched\"\n
-[Semantic Error] Type Mismatch Error[23] at line 0: \"Dimension Mismatched\"
+[Semantic Error] Invalid Operation Error[20] at line 12: "Expected to have 4 indices, but got 5"

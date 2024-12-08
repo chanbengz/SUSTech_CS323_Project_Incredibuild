@@ -22,10 +22,10 @@ impl fmt::Display for ProgramPart {
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Statement::Include(s) => write!(f, "Include: {}", s),
-            Statement::GlobalVariable(vars) => write!(f, "GlobalVariable: [{}]", 
+            Statement::Include(s, _) => write!(f, "Include: {}", s),
+            Statement::GlobalVariable(vars, _) => write!(f, "GlobalVariable: [{}]", 
                 vars.iter().map(|var| format!("{}", var)).collect::<Vec<String>>().join(", ")),
-            Statement::Struct(structure) => write!(f, "Struct: {}", structure),
+            Statement::Struct(structure, _) => write!(f, "Struct: {}", structure),
             Statement::Error => write!(f, "[StatementError]"),
         }
     }
@@ -195,14 +195,14 @@ impl fmt::Display for Body {
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expr::If(if_expr) => write!(f, "{}", if_expr),
-            Expr::Loop(loop_expr) => write!(f, "{}", loop_expr),
-            Expr::Break => write!(f, "Break"),
-            Expr::Continue => write!(f, "Continue"),
-            Expr::Body(body) => write!(f, "\nNested {}", body),
-            Expr::Return(val) => write!(f, "Return: {}", val),
-            Expr::FuncCall(func) => write!(f, "{}", func),
-            Expr::VarManagement(vars) => write!(f, "{}", 
+            Expr::If(if_expr, _) => write!(f, "{}", if_expr),
+            Expr::Loop(loop_expr, _) => write!(f, "{}", loop_expr),
+            Expr::Break(_) => write!(f, "Break"),
+            Expr::Continue(_) => write!(f, "Continue"),
+            Expr::Body(body, _) => write!(f, "\nNested {}", body),
+            Expr::Return(val, _) => write!(f, "Return: {}", val),
+            Expr::FuncCall(func, _) => write!(f, "{}", func),
+            Expr::VarManagement(vars, _) => write!(f, "{}", 
                 vars.iter().map(|var| format!("{}", var)).collect::<Vec<String>>().join("; ")),
             Expr::Error => write!(f, "[ExprError]"),
         }

@@ -1,0 +1,2 @@
+[Semantic Error] Invalid Operation Error[5] at line 14: "Assigning a value of type Array: (Int, [2]) to a variable of type Primitive: type: Int"
+[Semantic Error] Invalid Operation Error[5] at line 15: "Assigning a value of type Primitive: type: Float to a variable of type Array: (Int, [3])"

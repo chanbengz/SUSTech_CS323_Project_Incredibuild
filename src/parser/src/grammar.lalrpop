@@ -170,7 +170,7 @@ DimDecs: Vec<tree::CompExpr> = {
 * 4. TODO: macro definition 
 */
 pub Stmt: tree::Statement = {
-    "struct" <name:Identifier> "{" <fields:FieldsDec> "}" <l:@L> <semicolon:";"?> <r:@R> => {
+    "struct" <name:Identifier> "{" <vl:@L> <fields:FieldsDec> <vr:@R> "}" <l:@L> <semicolon:";"?> <r:@R> => {
         if semicolon == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
@@ -188,15 +188,25 @@ pub Stmt: tree::Statement = {
             tree::Variable::StructDefinition(
                 Box::new(name),
                 Box::new(fields)
-            )
+            ),
+            Span {
+                source: source.to_string(),
+                start: vl,
+                end: vr
+            }
         )
     },
-    "include" <name:"string"> => {
+    "include" <l:@L>  <name:"string"> <r:@R> => {
         tree::Statement::Include(
-            Box::new(name)
+            Box::new(name),
+            Span {
+                source: source.to_string(),
+                start: l,
+                end: r
+            }
         )
     },
-    <global: VarDef> <l:@L> <semicolon:";"?> <r:@R> => {
+    <vl:@L> <global: VarDef> <vr: @R> <l:@L> <semicolon:";"?> <r:@R> => {
         if semicolon == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
@@ -210,7 +220,14 @@ pub Stmt: tree::Statement = {
             };
             errors.push(error);
         }
-        tree::Statement::GlobalVariable(global)
+        tree::Statement::GlobalVariable(
+            global,
+            Span {
+                source: source.to_string(),
+                start: vl,
+                end: vr
+            }
+        )
     },
     <l:@L> <missing:!> <r:@R> ";" => {
         let error = ErrorRecovery {
@@ -298,20 +315,30 @@ pub FuncDec: Box<tree::Function> = {
 }
 
 FuncCall: tree::Expr = {
-    <name:Identifier> "(" ")" ";" => {
+    <vl:@L> <name:Identifier> "(" ")" ";" <vr:@R> => {
         tree::Expr::FuncCall(
             tree::Function::FuncReference(
                 Box::new(name),
                 Vec::new()
-            )
+            ),
+            Span {
+                source: source.to_string(),
+                start: vl,
+                end: vr
+            }
         )
     },
-    <name:Identifier> "(" <args:ArgList> ")" ";" => {
+    <vl:@L> <name:Identifier> "(" <args:ArgList> ")" ";" <vr:@R>=> {
         tree::Expr::FuncCall(
             tree::Function::FuncReference(
                 Box::new(name),
                 args
-            )
+            ),
+            Span {
+                source: source.to_string(),
+                start: vl,
+                end: vr
+            }
         )
     }
 }
@@ -339,7 +366,7 @@ Expr: tree::Expr = {
 }
 
 OpenExpr: tree::Expr = {
-    "if" "(" <l:@L> <cond:CondExpr?> ")" <body:Expr> => {
+    "if" <vl:@L>"(" <l:@L> <cond:CondExpr?> ")" <vr:@R> <body:Expr> <vd:@R> => {
         let cond = match cond {
             Some(cond) => cond,
             None => {
@@ -358,18 +385,25 @@ OpenExpr: tree::Expr = {
             }
         };
         let body = match body {
-            tree::Expr::Body(body) => body,
+            tree::Expr::Body(body, _) => body,
             _ => tree::Body::Body(vec![body])
         };
-        tree::Expr::If(tree::If::IfExpr(cond, body))
+        tree::Expr::If(
+            tree::If::IfExpr(cond, body),
+            Span {
+                source: source.to_string(),
+                start: vl,
+                end: vr
+            }
+        )
     },
-    "if" "(" <cond:CondExpr> <l:@L> <rb:")"> <r:@R> <body:CloseExpr> "else" <body_2:OpenExpr> => {
+    "if" <vl:@L>"(" <cond:CondExpr> <l:@L> <rb:")"> <r:@R> <v1l:@L> <body:CloseExpr> <v1r:@R> "else" <v2l:@L> <body_2:OpenExpr> <v2r:@R> => {
         let body = match body {
-            tree::Expr::Body(body) => body,
+            tree::Expr::Body(body, _) => body,
             _ => tree::Body::Body(vec![body])
         };
         let body_2 = match body_2 {
-            tree::Expr::Body(body) => body,
+            tree::Expr::Body(body, _) => body,
             _ => tree::Body::Body(vec![body_2])
         };
         tree::Expr::If(
@@ -377,7 +411,12 @@ OpenExpr: tree::Expr = {
                 cond,
                 body,
                 body_2
-            )
+            ),
+            Span {
+                source: source.to_string(),
+                start: vl,
+                end: r
+            }
         )
     },
     // if ( error ) { ... }
@@ -458,13 +497,13 @@ OpenExpr: tree::Expr = {
 }
 
 CloseExpr: tree::Expr = {
-    "if" "(" <cond:CondExpr> ")" <body:CloseExpr> "else" <body_2:CloseExpr> => {
+    "if" <vl:@L>"(" <cond:CondExpr> ")"<vr:@R> <v1l:@L> <body:CloseExpr> <v1r:@R> "else" <v2l:@L> <body_2:CloseExpr> <v2r:@R>  => {
         let body = match body {
-            tree::Expr::Body(body) => body,
+            tree::Expr::Body(body, _) => body,
             _ => tree::Body::Body(vec![body])
         };
         let body_2 = match body_2 {
-            tree::Expr::Body(body) => body,
+            tree::Expr::Body(body, _) => body,
             _ => tree::Body::Body(vec![body_2])
         };
         tree::Expr::If(
@@ -472,20 +511,45 @@ CloseExpr: tree::Expr = {
                 cond,
                 body,
                 body_2
-            )
+            ),
+            Span {
+                source: source.to_string(),
+                start: vl,
+                end: vr
+            }
         )
     },
     <expr:WhileExpr> => expr,
     <expr:ForExpr> => expr,
     <expr:FuncCall> => expr,
     <expr:VarManagement> ";" => expr,
-    <expr:"break"> ";" => tree::Expr::Break,
-    <expr:"continue"> ";" => tree::Expr::Continue,
-    <expr:"return"> <val:CompExpr?> ";" => match val {
-        None => tree::Expr::Return(tree::CompExpr::Value(tree::Value::Null)),
-        Some(val) => tree::Expr::Return(*val)
+    <l:@L> <expr:"break"> ";" => tree::Expr::Break(Span {
+        source: source.to_string(),
+        start: l,
+        end: l + 1
+    }),
+    <l:@L> <expr:"continue"> ";" => tree::Expr::Continue(Span {
+        source: source.to_string(),
+        start: l,
+        end: l + 1
+    }),
+    <l:@L> <expr:"return"> <val:CompExpr?> ";" => match val {
+        None => tree::Expr::Return(tree::CompExpr::Value(tree::Value::Null), Span {
+            source: source.to_string(),
+            start: l,
+            end: l + 1
+        }),
+        Some(val) => tree::Expr::Return(*val, Span {
+            source: source.to_string(),
+            start: l,
+            end: l + 1
+        })
     },
-    "{" <expr:Body> "}" => tree::Expr::Body(expr),
+    "{" <vl:@L> <expr:Body> <vr:@R> "}" => tree::Expr::Body(expr, Span {
+        source: source.to_string(),
+        start: vl,
+        end: vr
+    }),
 
     // Error handling
     <expr:VarManagement> <l:@L> <missing:!> <r:@R> => {
@@ -575,7 +639,7 @@ WhileExpr: tree::Expr = {
         errors.push(error);
         tree::Expr::Error
     },
-    "while" "(" <cond:CondExpr> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> "}" => {
+    "while" <vl:@L>"(" <cond:CondExpr> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> "}" => {
         if rb == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
@@ -593,20 +657,46 @@ WhileExpr: tree::Expr = {
             tree::Loop::WhileExpr(
                 cond,
                 body
-            )
+            ),
+            Span {
+                source: source.to_string(),
+                start: vl,
+                end: r
+            }
         )
     }
 }
 
 ForExpr: tree::Expr = {
-    "for" "(" <init:VarManagement?> ";" <cond:CondExpr?> ";" <update:VarManagement?> ")" "{" <body:Body> "}" => {
+    "for" <vl:@L> "(" <init:VarManagement?> ";" <cond:CondExpr?> ";" <update:VarManagement?> ")" <vr:@R> "{" <body:Body> "}" => {
         tree::Expr::Loop(
             tree::Loop::ForExpr(
-                init.map(Box::new).unwrap_or(Box::new(tree::Expr::VarManagement(Vec::new()))),
+                init.map(Box::new).unwrap_or(Box::new(
+                    tree::Expr::VarManagement(
+                        Vec::new(),
+                        Span {
+                        source: source.to_string(),
+                        start: vl,
+                        end: vl + 1
+                    }
+                ))),
                 cond.unwrap_or(Box::new(tree::CondExpr::Bool(true))),
-                update.map(Box::new).unwrap_or(Box::new(tree::Expr::VarManagement(Vec::new()))),
+                update.map(Box::new).unwrap_or(Box::new(
+                    tree::Expr::VarManagement(
+                        Vec::new(),
+                        Span {
+                        source: source.to_string(),
+                        start: vr - 1,
+                        end: vr
+                    }
+                ))),
                 body
-            )
+            ),
+            Span {
+                source: source.to_string(),
+                start: vl,
+                end: vr
+            }
         )
     },
 }
@@ -635,7 +725,7 @@ StructRef: Vec<(Box<String>, Box<String>, Box<Vec<tree::CompExpr>>)> = {
         ));
         v
     },
-    <parent:Identifier> "." <l:@L> <field:Identifier?> <r:@R> => {
+    <parent:Identifier> "." <l:@L> <field:Identifier?> <r:@R> <dims:DimDecs?> => {
         if field == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
@@ -651,7 +741,11 @@ StructRef: Vec<(Box<String>, Box<String>, Box<Vec<tree::CompExpr>>)> = {
             return Vec::new();
         }
         let mut v = Vec::new();
-        v.push((Box::new(parent), Box::new(field.unwrap()), Box::new(Vec::new())));
+        v.push((
+            Box::new(parent), 
+            Box::new(field.unwrap()), 
+            Box::new(dims.unwrap_or(Vec::new()))
+        ));
         v
     },
 }
@@ -663,26 +757,41 @@ VarManagement: tree::Expr = {
      * 3. identifier++;
      * 4. identifier--;
     */
-    <def: VarDef> => {
+    <vl:@L> <def: VarDef> <vr:@R> => {
         tree::Expr::VarManagement(
-            def
+            def,
+            Span {
+                source: source.to_string(),
+                start: vl,
+                end: vr
+            }
         )
     },
-    <def: VarDec> => {
+    <vl:@L> <def: VarDec> <vr:@R> => {
         tree::Expr::VarManagement(
-            vec![def]
+            vec![def],
+            Span {
+                source: source.to_string(),
+                start: vl,
+                end: vr
+            }
         )
     },
-    <s:StructRef> "=" <val:CompExpr> => {
+    <vl:@L> <s:StructRef> "=" <val:CompExpr> <vr:@R> => {
         let s = Box::new(tree::Variable::MemberReference(s));
         tree::Expr::VarManagement(
             vec![tree::Variable::StructAssignment(
                 s,
                 val
-            )]
+            )],
+            Span {
+                source: source.to_string(),
+                start: vl,
+                end: vr
+            }
         )
     },
-    <lhs:Identifier> <dims:DimDecs?> "++" => {
+    <vl:@L> <lhs:Identifier> <dims:DimDecs?> "++" <vr:@R> => {
         let dims = match dims {
             Some(dims) => dims,
             None => Vec::new()
@@ -696,10 +805,15 @@ VarManagement: tree::Expr = {
                     Box::new(tree::CompExpr::Value(tree::Value::Integer(1)))
                 )),
                 Box::new(Vec::new())
-            )]
+            )],
+            Span {
+                source: source.to_string(),
+                start: vl,
+                end: vr
+            }
         )
     },
-    <lhs:Identifier> <dims:DimDecs?> "--" => {
+    <vl:@L> <lhs:Identifier> <dims:DimDecs?> "--" <vr:@R> => {
         let dims = match dims {
             Some(dims) => dims,
             None => Vec::new()
@@ -713,7 +827,12 @@ VarManagement: tree::Expr = {
                     Box::new(tree::CompExpr::Value(tree::Value::Integer(1)))
                 )),
                 Box::new(Vec::new())
-            )]
+            )],
+            Span {
+                source: source.to_string(),
+                start: vl,
+                end: vr
+            }
         )
     },
 }
@@ -729,12 +848,26 @@ VarDef: Vec<tree::Variable> = {
             Box::new(Vec::new())
         )]
     },
-    "struct" <str: Identifier> <name:Identifier> "{" <fields:StructDecs> "}"=> {
-        vec![tree::Variable::StructDeclaration(
+    "struct" <str: Identifier> <name:Identifier> "=" "{" <fields:StructDecs> "}"=> {
+        let mut variables = Vec::new();
+        variables.push(tree::Variable::StructDeclaration(
             Box::new(str),
-            Box::new(name),
-            Box::new(fields)
-        )]
+            Box::new(name.clone()),
+            Box::new(Vec::new())
+        ));
+        for field in fields {
+            match field {
+                tree::Variable::VarAssignment(member_name, value, dims) => {
+                    let member = tree::Variable::MemberReference(vec![(Box::new(name.clone()), member_name, dims)]);
+                    variables.push(tree::Variable::StructAssignment(
+                        Box::new(member),
+                        value
+                    ));
+                },
+                _ => {}
+            }
+        }
+        variables
     },
     <spec: Specifier> <var: VarDecs> => {
         let mut variables = Vec::new();
@@ -815,7 +948,7 @@ VarDec: tree::Variable = {
 }
 
 StructDec: tree::Variable = {
-    "." <ident: Identifier> "=" <val: CompExpr> => {
+    "." <ident: Identifier> ":" <val: CompExpr> => {
         tree::Variable::VarAssignment(
             Box::new(ident),
             val,
@@ -1060,12 +1193,12 @@ Term: Box<tree::CompExpr> = {
     "-"  <n: "float"> => Box::new(tree::CompExpr::Value(tree::Value::Float(-n))),
     <n: "char"> => Box::new(tree::CompExpr::Value(tree::Value::Char(n))),
 
-    <ident: Identifier> "(" ")" => {
+    <vl:@L> <ident: Identifier> "(" ")" <vr:@R>=> {
         Box::new(tree::CompExpr::FuncCall(
             tree::Function::FuncReference(Box::new(ident), Vec::new())
         ))
     },
-    <ident: Identifier> "(" <args:ArgList> ")" => {
+    <vl:@L> <ident: Identifier> "(" <args:ArgList> ")" <vr:@R>=> {
         Box::new(tree::CompExpr::FuncCall(
             tree::Function::FuncReference(Box::new(ident), args)
         ))
