@@ -44,5 +44,6 @@ pub enum BasicType {
 	Float,
 	Bool,
 	String,
+	Struct,
 	Null
 }
