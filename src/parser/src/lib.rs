@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn test_0_r00() {
-        assert_parse_from_file(Parser::FuncDecParser, "../test/mid/test_syntax_2.spl","../test/mid/test_syntax_2.out");
+        assert_parse_from_file(Parser::FuncDecParser, "../test/test_0_r00.spl","../test/test_0_r00.out");
     }
 
     #[test]

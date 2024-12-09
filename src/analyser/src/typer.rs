@@ -222,6 +222,7 @@ impl TypeChecker {
             BasicType::Char => self.func_ret_type = FuncRetType::Char,
             BasicType::Bool => self.func_ret_type = FuncRetType::Bool,
             BasicType::Null => self.func_ret_type = FuncRetType::Void,
+            BasicType::Struct => self.func_ret_type = FuncRetType::Void,
             BasicType::String => self.func_ret_type = FuncRetType::String,
         }
     }

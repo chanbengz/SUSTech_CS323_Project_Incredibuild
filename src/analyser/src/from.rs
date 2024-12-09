@@ -23,6 +23,7 @@ impl From<BasicType> for FuncRetType {
             BasicType::Char => FuncRetType::Char,
             BasicType::Bool => FuncRetType::Bool,
             BasicType::String => FuncRetType::String,
+            BasicType::Struct => FuncRetType::Void,
             BasicType::Null => FuncRetType::Void
         }
     }
