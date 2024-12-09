@@ -1,6 +1,7 @@
 extern crate llvm_ir as llvm;
 
 use spl_parser::{parse_from_file};
+use spl_analyser::walker::Walker;
 use clap::{Arg, Command};
 use colored::Colorize;
 // use std::ffi::CString;
@@ -25,6 +26,13 @@ fn main() {
         Err(e) => {
             println!("{}", e.red());
         }
+    }
+
+    let mut walker = Walker::new(&source_path);
+    walker.traverse();
+    let errors = walker.get_errors();
+    for error in errors {
+        println!("{}", error.to_string().red());
     }
 
     // unsafe {
