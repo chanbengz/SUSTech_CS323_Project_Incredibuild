@@ -10,6 +10,7 @@ impl From<Value> for BasicType {
             Value::Char(_) => BasicType::Char,
             Value::Bool(_) => BasicType::Bool,
             Value::String(_) => BasicType::String,
+            Value::Struct(_) => BasicType::Struct,
             Value::Null => BasicType::Null
         }
     }

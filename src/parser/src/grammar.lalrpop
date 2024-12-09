@@ -292,6 +292,7 @@ FieldsDec: Vec<tree::Variable> = {
 */
 pub FuncDec: Box<tree::Function> = {
     <ret: Specifier> <name:Identifier> <lb:"("> <params:ParaDecs> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> "}" => {
+
         if rb == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
@@ -312,6 +313,20 @@ pub FuncDec: Box<tree::Function> = {
             body
         ))
     },
+    <ret: Specifier> <name:Identifier> <lb:"("> <params:ParaDecs> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> ! => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(Span {
+                    source: source.to_string(),
+                    start: r,
+                    end: r + 1
+                }, "opening brace '{'".to_string())
+            },
+            dropped_tokens: Vec::new(), // or specify the dropped tokens
+        };
+        errors.push(error);
+        Box::new(tree::Function::Error)
+    }
 }
 
 FuncCall: tree::Expr = {
@@ -397,7 +412,7 @@ OpenExpr: tree::Expr = {
             }
         )
     },
-    "if" <vl:@L>"(" <cond:CondExpr> <l:@L> <rb:")"> <r:@R> <v1l:@L> <body:CloseExpr> <v1r:@R> "else" <v2l:@L> <body_2:OpenExpr> <v2r:@R> => {
+    "if" <vl:@L> "(" <cond:CondExpr> <l:@L> <rb:")"> <r:@R> <v1l:@L> <body:CloseExpr> <v1r:@R> "else" <v2l:@L> <body_2:OpenExpr> <v2r:@R> => {
         let body = match body {
             tree::Expr::Body(body, _) => body,
             _ => tree::Body::Body(vec![body])
@@ -497,7 +512,7 @@ OpenExpr: tree::Expr = {
 }
 
 CloseExpr: tree::Expr = {
-    "if" <vl:@L>"(" <cond:CondExpr> ")"<vr:@R> <v1l:@L> <body:CloseExpr> <v1r:@R> "else" <v2l:@L> <body_2:CloseExpr> <v2r:@R>  => {
+    "if" <vl:@L> "(" <cond:CondExpr> ")" <vr:@R> <v1l:@L> <body:CloseExpr> <v1r:@R> "else" <v2l:@L> <body_2:CloseExpr> <v2r:@R>  => {
         let body = match body {
             tree::Expr::Body(body, _) => body,
             _ => tree::Body::Body(vec![body])
@@ -608,20 +623,6 @@ CloseExpr: tree::Expr = {
         errors.push(error);
         tree::Expr::Error
     },
-    <l:@R> ! <r:@R> <expr:CloseExpr>  => {
-        let error = ErrorRecovery {
-            error: ParseError::User {
-                error: LexicalError::StatementError(Span {
-                    source: source.to_string(),
-                    start: l,
-                    end: r
-                }, "No 'if' before 'else'".to_string())
-            },
-            dropped_tokens: Vec::new(),
-        };
-        errors.push(error);
-        tree::Expr::Error
-    },
 }
 
 WhileExpr: tree::Expr = {
@@ -701,7 +702,7 @@ ForExpr: tree::Expr = {
     },
 }
 
-StructRef: Vec<(Box<String>, Box<String>, Box<Vec<tree::CompExpr>>)> = {
+StructRef: Vec<tree::Variable> = {
     <mut v:StructRef> "." <l:@L> <field:Identifier?> <r:@R> <dims:DimDecs?> => {
         if field == None {
             let error = ErrorRecovery {
@@ -718,14 +719,13 @@ StructRef: Vec<(Box<String>, Box<String>, Box<Vec<tree::CompExpr>>)> = {
             return Vec::new();
         }
         let last = v.last().unwrap().clone();
-        v.push((
-            Box::new((*last.1).clone()),
+        v.push(tree::Variable::VarReference(
             Box::new(field.unwrap()),
             Box::new(dims.unwrap_or(Vec::new()))
         ));
         v
     },
-    <parent:Identifier> "." <l:@L> <field:Identifier?> <r:@R> <dims:DimDecs?> => {
+    <parent:Identifier> <parent_dims: DimDecs?> "." <l:@L> <field:Identifier?> <r:@R> <dims:DimDecs?> => {
         if field == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
@@ -740,13 +740,13 @@ StructRef: Vec<(Box<String>, Box<String>, Box<Vec<tree::CompExpr>>)> = {
             errors.push(error);
             return Vec::new();
         }
-        let mut v = Vec::new();
-        v.push((
-            Box::new(parent), 
-            Box::new(field.unwrap()), 
+        vec![tree::Variable::VarReference(
+            Box::new(parent.clone()),
+            Box::new(parent_dims.unwrap_or(Vec::new()))
+        ), tree::Variable::VarReference(
+            Box::new(field.unwrap()),
             Box::new(dims.unwrap_or(Vec::new()))
-        ));
-        v
+        )]
     },
 }
 
@@ -778,10 +778,9 @@ VarManagement: tree::Expr = {
         )
     },
     <vl:@L> <s:StructRef> "=" <val:CompExpr> <vr:@R> => {
-        let s = Box::new(tree::Variable::MemberReference(s));
         tree::Expr::VarManagement(
             vec![tree::Variable::StructAssignment(
-                s,
+                Box::new(s),
                 val
             )],
             Span {
@@ -841,15 +840,24 @@ VarManagement: tree::Expr = {
 // You should be able to declare multiple variables at once
 // However, some varaibles is declared with initial value, then it should be treated as assignment
 VarDef: Vec<tree::Variable> = {
-    "struct" <str: Identifier> <name:Identifier> => {
-        vec![tree::Variable::StructDeclaration(
-            Box::new(str),
-            Box::new(name),
-            Box::new(Vec::new())
-        )]
-    },
-    "struct" <str: Identifier> <name:Identifier> "=" "{" <fields:StructDecs> "}"=> {
+    <spec:Specifier> <name:Identifier> "=" "{" <fields:StructDecs> "}"=> {
         let mut variables = Vec::new();
+        let str = if let tree::Value::Struct(s) = spec {
+            s
+        } else {
+            let error = ErrorRecovery {
+                error: ParseError::User {
+                    error: LexicalError::StatementError(Span {
+                        source: source.to_string(),
+                        start: 0,
+                        end: 0
+                    }, "Invalid struct specifier".to_string())
+                },
+                dropped_tokens: Vec::new(),
+            };
+            errors.push(error);
+            return Vec::new();
+        };
         variables.push(tree::Variable::StructDeclaration(
             Box::new(str),
             Box::new(name.clone()),
@@ -858,7 +866,8 @@ VarDef: Vec<tree::Variable> = {
         for field in fields {
             match field {
                 tree::Variable::VarAssignment(member_name, value, dims) => {
-                    let member = tree::Variable::MemberReference(vec![(Box::new(name.clone()), member_name, dims)]);
+                    let mut member = vec![tree::Variable::VarReference(Box::new(name.clone()), Box::new(Vec::new()))];
+                    member.push(tree::Variable::VarReference(Box::new(member_name), Box::new(dims)));
                     variables.push(tree::Variable::StructAssignment(
                         Box::new(member),
                         value
@@ -871,14 +880,25 @@ VarDef: Vec<tree::Variable> = {
     },
     <spec: Specifier> <var: VarDecs> => {
         let mut variables = Vec::new();
+        let str = if let tree::Value::Struct(ref s) = spec { s.clone() } else { "".to_string() };
         var.iter().for_each(|x| {
             match x {
                 tree::Variable::VarDeclaration(name, value, size) => {
-                    variables.push(tree::Variable::VarDeclaration(name.clone(), Box::new(spec.to_owned()), size.clone()));
+                    if spec == tree::Value::Struct(str.clone()) {
+                        variables.push(tree::Variable::StructDeclaration(
+                            Box::new(str.clone()),
+                            name.clone(),
+                            size.to_owned()
+                        ));
+                    } else {
+                        variables.push(tree::Variable::VarDeclaration(name.clone(), Box::new(spec.to_owned()), size.clone()));
+                    }
                 },
                 tree::Variable::VarAssignment(name, value, dims) => {
-                    variables.push(tree::Variable::VarDeclaration(name.clone(), Box::new(spec.to_owned()), Box::new(Vec::new())));
-                    variables.push(tree::Variable::VarAssignment(name.clone(), value.to_owned(), dims.clone()));
+                    if spec != tree::Value::Struct(str.clone()) {
+                        variables.push(tree::Variable::VarDeclaration(name.clone(), Box::new(spec.to_owned()), Box::new(Vec::new())));
+                        variables.push(tree::Variable::VarAssignment(name.clone(), value.to_owned(), dims.clone()));
+                    }
                 },
                 _ => {}
             }
@@ -924,21 +944,6 @@ VarDec: tree::Variable = {
                     start: l,
                     end: l + 1
                 }, "right value".to_string())
-            },
-            dropped_tokens: Vec::new(),
-        };
-        errors.push(error);
-        tree::Variable::Error
-    },
-
-    ! <l:@L> "=" CompExpr <r:@R> => {
-        let error = ErrorRecovery {
-            error: ParseError::User {
-                error: LexicalError::StatementError(Span {
-                    source: source.to_string(),
-                    start: l,
-                    end: r
-                }, "Unexpected statement".to_string())
             },
             dropped_tokens: Vec::new(),
         };
@@ -1159,6 +1164,9 @@ Specifier: tree::Value = {
     <t:"typechar"> => tree::Value::Char(' '),
     <t:"typestr"> => tree::Value::String(String::new()),
     <t:"void"> => tree::Value::Null,
+    "struct" <str: Identifier> => {
+        tree::Value::Struct(str)
+    },
 }
 
 Term: Box<tree::CompExpr> = {
@@ -1205,7 +1213,7 @@ Term: Box<tree::CompExpr> = {
     },
 
     <s:StructRef> => {
-        Box::new(tree::CompExpr::Variable(tree::Variable::MemberReference(s)))
+        Box::new(tree::CompExpr::Variable(tree::Variable::StructReference(Box::new(s))))
     },
 
     // error recovery
@@ -1281,6 +1289,7 @@ extern {
     type Error = LexicalError;
 
     enum Token {
+        "eof" => Token::EndOfProgram,
         "identifier" => Token::Identifier(<String>),
     
         "int" => Token::LiteralInt(<u32>),

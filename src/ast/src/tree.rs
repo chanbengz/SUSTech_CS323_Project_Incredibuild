@@ -30,13 +30,14 @@ pub enum Variable {
     // Variable can be a single value or an array.
     VarReference(Box<String>, Box<Vec<CompExpr>>), // varname, offsets
     VarDeclaration(Box<String>, Box<Value>, Box<Vec<CompExpr>>), // varname, type, offsets
-    VarAssignment(Box<String>, Box<CompExpr>, Box<Vec<CompExpr>>), // varname, expr, offsets
+    VarAssignment(Box<Variable>, Box<CompExpr>, Box<Vec<CompExpr>>),
+    // VarAssignment allows only for VarReference and StructReference.
 
     // Struct definition and declaration
     StructDefinition(Box<String>, Box<Vec<Variable>>),
-    StructDeclaration(Box<String>, Box<String>, Box<Vec<Variable>>),
-    StructAssignment(Box<Variable>, Box<CompExpr>),
-    MemberReference(Vec<(Box<String>, Box<String>, Box<Vec<CompExpr>>)>),
+    StructDeclaration(Box<String>, Box<String>, Box<Vec<CompExpr>>),
+    StructReference(Box<Vec<Variable>>),// Struct Reference accepts a recursive call of VarReference
+    // The first represents the struct variable name and the others are member fields.
 
     // Function Parameter
     FormalParameter(Box<String>, Box<Value>, Box<Vec<usize>>),
@@ -83,6 +84,7 @@ pub enum Value {
     String(String),
     Char(char),
     Bool(bool),
+    Struct(String),
     Null
 }
 

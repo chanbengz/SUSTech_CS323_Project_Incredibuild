@@ -38,10 +38,6 @@ impl fmt::Display for Variable {
                 ident,
                 value,
                 dims.iter().map(|d| d.to_string()).collect::<Vec<String>>().join(", ")),
-            Variable::MemberReference(refs) => write!(f, "Member Reference: [{}]",
-                refs.iter().map(|(ident, field, dims)| format!("{}.{}{}", ident, field,
-                    dims.iter().map(|d| format!("[{}]", d)).collect::<Vec<String>>().join(""))).collect::<Vec<String>>().join(", ")
-            ),
             Variable::FormalParameter(ident, value, dims) => write!(f, "Formal Parameter: {} = [{}] with dimensions [{}]",
                 ident,
                 value,
@@ -57,9 +53,13 @@ impl fmt::Display for Variable {
                 ident, 
                 parent, 
                 vars.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", ")),
-            Variable::StructAssignment(var, expr) => write!(f, "Struct Assignment: {} = {}", var, expr),
-
-            Variable::Error => write!(f, "[VariableError]")
+            Variable::StructAssignment(var, expr) => write!(f, "Struct Assignment: {} = {}",
+                var.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", "), expr),
+            Variable::MemberReference(ident, member, dims) => write!(f, "Member Reference: {}.{}{}", ident, member,
+                dims.iter().map(|d| format!("[{}]", d)).collect::<Vec<String>>().join("")),
+            Variable::StructReference(vars) => write!(f, "Struct Reference: [{}]",
+                vars.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", ")),
+            Variable::Error => write!(f, "[VariableError]"),
         }
     }
 }
@@ -112,6 +112,7 @@ impl fmt::Display for Value {
             Value::String(s) => write!(f, "{}: String", s),
             Value::Char(c) => write!(f, "{}: char", c),
             Value::Bool(b) => write!(f, "{}: bool", b),
+            Value::Struct(s) => write!(f, "Struct: {}", s),
             Value::Null => write!(f, "null")
         }
     }
