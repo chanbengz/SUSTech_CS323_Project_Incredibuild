@@ -141,7 +141,7 @@ DimDecs: Vec<tree::CompExpr> = {
                 error: LexicalError::MissingLexeme(Span {
                     source: source.to_string(),
                     start: l,
-                    end: r
+                    end: l + 1
                 }, "closing bracket ']'".to_string())
             },
             dropped_tokens: Vec::new(),
@@ -922,7 +922,7 @@ VarDec: tree::Variable = {
                 error: LexicalError::MissingLexeme(Span {
                     source: source.to_string(),
                     start: l,
-                    end: r
+                    end: l + 1
                 }, "right value".to_string())
             },
             dropped_tokens: Vec::new(),
@@ -1169,7 +1169,7 @@ Term: Box<tree::CompExpr> = {
                 error: LexicalError::MissingLexeme(Span {
                     source: source.to_string(),
                     start: l,
-                    end: r
+                    end: l + 1
                 }, "closing parenthesis ')'".to_string())
             },
             dropped_tokens: Vec::new(),
