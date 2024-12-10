@@ -236,8 +236,8 @@ mod tests {
                 &format!("../test/phase1/basic/test_1_r{:0>2}.out", i)
             );
         }
-        for i in 1..13 {
-            if i == 7 || i == 8{
+        for i in 1..14 {
+            if i == 7 || i == 8 {
                 continue;
             }
             assert_parse_from_file(Parser::ProgramParser,

@@ -355,7 +355,21 @@ FuncCall: tree::Expr = {
                 end: vr
             }
         )
-    }
+    },
+    <name:Identifier> "(" ArgList? <el:@L> ! ";" => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(Span {
+                    source: source.to_string(),
+                    start: el,
+                    end: el + 1,
+                }, "closing parenthesis ')'".to_string())
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        tree::Expr::Error
+    },
 }
 
 /*
@@ -381,7 +395,7 @@ Expr: tree::Expr = {
 }
 
 OpenExpr: tree::Expr = {
-    "if" <vl:@L>"(" <l:@L> <cond:CondExpr?> ")" <vr:@R> <body:Expr> <vd:@R> => {
+    "if" <vl:@L> "(" <l:@L> <cond:CondExpr?> ")" <vr:@R> <body:Expr> <vd:@R> => {
         let cond = match cond {
             Some(cond) => cond,
             None => {
@@ -434,6 +448,7 @@ OpenExpr: tree::Expr = {
             }
         )
     },
+
     // if ( error ) { ... }
     "if" "(" <l:@L> <cond:CompExpr> ")" <body:Expr> => {
         let error = ErrorRecovery {
@@ -1307,7 +1322,6 @@ extern {
     type Error = LexicalError;
 
     enum Token {
-        "eof" => Token::EndOfProgram,
         "identifier" => Token::Identifier(<String>),
     
         "int" => Token::LiteralInt(<u32>),
