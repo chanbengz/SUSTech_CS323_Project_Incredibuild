@@ -313,14 +313,14 @@ pub FuncDec: Box<tree::Function> = {
             body
         ))
     },
-    <ret: Specifier> <name:Identifier> <lb:"("> <params:ParaDecs> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> ! => {
+    <ret: Specifier> <name:Identifier> <lb:"("> <params:ParaDecs> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> ! <vr:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
                 error: LexicalError::MissingLexeme(Span {
                     source: source.to_string(),
-                    start: r,
-                    end: r + 1
-                }, "opening brace '{'".to_string())
+                    start: vr,
+                    end: vr + 1
+                }, "closing brace '}'".to_string())
             },
             dropped_tokens: Vec::new(), // or specify the dropped tokens
         };
@@ -779,8 +779,8 @@ VarManagement: tree::Expr = {
     },
     <vl:@L> <s:StructRef> "=" <val:CompExpr> <vr:@R> => {
         tree::Expr::VarManagement(
-            vec![tree::Variable::StructAssignment(
-                Box::new(s),
+            vec![tree::Variable::VarAssignment(
+                Box::new(tree::Variable::StructReference(Box::new(s))),
                 val
             )],
             Span {
@@ -797,13 +797,12 @@ VarManagement: tree::Expr = {
         };
         tree::Expr::VarManagement(
             vec![tree::Variable::VarAssignment(
-                Box::new(lhs.clone()),
+                Box::new(tree::Variable::VarReference(Box::new(lhs.clone()), Box::new(dims.clone()))),
                 Box::new(tree::CompExpr::BinaryOperation(
-                    Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(lhs.clone()), Box::new(dims)))),
+                    Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(lhs.clone()), Box::new(dims.clone())))),
                     tree::BinaryOperator::Add,
                     Box::new(tree::CompExpr::Value(tree::Value::Integer(1)))
                 )),
-                Box::new(Vec::new())
             )],
             Span {
                 source: source.to_string(),
@@ -819,13 +818,12 @@ VarManagement: tree::Expr = {
         };
         tree::Expr::VarManagement(
             vec![tree::Variable::VarAssignment(
-                Box::new(lhs.clone()),
+                Box::new(tree::Variable::VarReference(Box::new(lhs.clone()), Box::new(dims.clone()))),
                 Box::new(tree::CompExpr::BinaryOperation(
-                    Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(lhs.clone()), Box::new(dims)))),
+                    Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(lhs.clone()), Box::new(dims.clone())))),
                     tree::BinaryOperator::Sub,
                     Box::new(tree::CompExpr::Value(tree::Value::Integer(1)))
                 )),
-                Box::new(Vec::new())
             )],
             Span {
                 source: source.to_string(),
@@ -840,7 +838,7 @@ VarManagement: tree::Expr = {
 // You should be able to declare multiple variables at once
 // However, some varaibles is declared with initial value, then it should be treated as assignment
 VarDef: Vec<tree::Variable> = {
-    <spec:Specifier> <name:Identifier> "=" "{" <fields:StructDecs> "}"=> {
+    <spec:Specifier> <name:Identifier> <dim: DimDecs?> "=" "{" <fields:StructDecs> "}"=> {
         let mut variables = Vec::new();
         let str = if let tree::Value::Struct(s) = spec {
             s
@@ -861,16 +859,16 @@ VarDef: Vec<tree::Variable> = {
         variables.push(tree::Variable::StructDeclaration(
             Box::new(str),
             Box::new(name.clone()),
-            Box::new(Vec::new())
+            Box::new(dim.clone().unwrap_or(Vec::new()))
         ));
         for field in fields {
             match field {
-                tree::Variable::VarAssignment(member_name, value, dims) => {
-                    let mut member = vec![tree::Variable::VarReference(Box::new(name.clone()), Box::new(Vec::new()))];
-                    member.push(tree::Variable::VarReference(Box::new(member_name), Box::new(dims)));
-                    variables.push(tree::Variable::StructAssignment(
-                        Box::new(member),
-                        value
+                tree::Variable::VarAssignment(mem, value) => {
+                    let mut member = vec![tree::Variable::VarReference(Box::new(name.clone()), Box::new(dim.clone().unwrap_or(Vec::new())))];
+                    member.push(*mem);
+                    variables.push(tree::Variable::VarAssignment(
+                        Box::new(tree::Variable::StructReference(Box::new(member))),
+                        value,
                     ));
                 },
                 _ => {}
@@ -880,24 +878,54 @@ VarDef: Vec<tree::Variable> = {
     },
     <spec: Specifier> <var: VarDecs> => {
         let mut variables = Vec::new();
-        let str = if let tree::Value::Struct(ref s) = spec { s.clone() } else { "".to_string() };
+        let str_ = if let tree::Value::Struct(ref s) = spec { s.clone() } else { "".to_string() };
         var.iter().for_each(|x| {
             match x {
                 tree::Variable::VarDeclaration(name, value, size) => {
-                    if spec == tree::Value::Struct(str.clone()) {
+                    if spec == tree::Value::Struct(str_.clone()) {
                         variables.push(tree::Variable::StructDeclaration(
-                            Box::new(str.clone()),
+                            Box::new(str_.clone()),
                             name.clone(),
                             size.to_owned()
                         ));
                     } else {
-                        variables.push(tree::Variable::VarDeclaration(name.clone(), Box::new(spec.to_owned()), size.clone()));
+                        variables.push(tree::Variable::VarDeclaration(
+                            name.clone(), 
+                            Box::new(spec.to_owned()), 
+                            size.clone()
+                        ));
                     }
                 },
-                tree::Variable::VarAssignment(name, value, dims) => {
-                    if spec != tree::Value::Struct(str.clone()) {
-                        variables.push(tree::Variable::VarDeclaration(name.clone(), Box::new(spec.to_owned()), Box::new(Vec::new())));
-                        variables.push(tree::Variable::VarAssignment(name.clone(), value.to_owned(), dims.clone()));
+                tree::Variable::VarAssignment(variable, value) => {
+                    let name = match &**variable {
+                        tree::Variable::VarReference(name, size) => {
+                            *name.clone()
+                        },
+                        _ => {
+                            let error = ErrorRecovery {
+                                error: ParseError::User {
+                                    error: LexicalError::StatementError(Span {
+                                        source: source.to_string(),
+                                        start: 0,
+                                        end: 0
+                                    }, "Invalid variable assignment".to_string())
+                                },
+                                dropped_tokens: Vec::new(),
+                            };
+                            errors.push(error);
+                            "INVALID".to_string()
+                        }
+                    };
+                    if spec != tree::Value::Struct(str_.clone()) {
+                        variables.push(tree::Variable::VarDeclaration(
+                            Box::new(name.clone()), 
+                            Box::new(spec.to_owned()), 
+                            Box::new(Vec::new())
+                        ));
+                        variables.push(tree::Variable::VarAssignment(
+                            variable.clone(), 
+                            value.clone()
+                        ));
                     }
                 },
                 _ => {}
@@ -912,26 +940,17 @@ VarDef: Vec<tree::Variable> = {
 // 2. identifier[size][size]...; => specifier ident[size][size]...;
 // 3. identifier = CompExpr; => specifier ident = CompExpr;
 VarDec: tree::Variable = {
-    <ident: Identifier> <size: DimDecs?> => {
-        let dims = match size {
-            Some(dims) => dims,
-            None => Vec::new()
-        };
+    <ident: Identifier> <dims: DimDecs?> => {
         tree::Variable::VarDeclaration(
             Box::new(ident),
             Box::new(tree::Value::Null),
-            Box::new(dims)
+            Box::new(dims.unwrap_or(Vec::new()))
         )
     },
     <l:@L> <ident: Identifier> <size: DimDecs?> "=" <val:CompExpr> <r:@R> => {
-        let dims = match size {
-            Some(dims) => dims,
-            None => Vec::new()
-        };
         tree::Variable::VarAssignment(
-            Box::new(ident),
+            Box::new(tree::Variable::VarReference(Box::new(ident), Box::new(size.unwrap_or(Vec::new())))),
             val,
-            Box::new(dims)
         )
     },
 
@@ -955,9 +974,8 @@ VarDec: tree::Variable = {
 StructDec: tree::Variable = {
     "." <ident: Identifier> ":" <val: CompExpr> => {
         tree::Variable::VarAssignment(
-            Box::new(ident),
+            Box::new(tree::Variable::VarReference(Box::new(ident), Box::new(Vec::new()))),
             val,
-            Box::new(Vec::new())
         )
     },
     ! => { errors.push(<>); tree::Variable::Error },

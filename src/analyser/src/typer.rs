@@ -1,12 +1,11 @@
-use std::fmt;
-
-use crate::{error::SemanticError, symbol::{VarType, BasicType}};
+use crate::symbol::{BasicType, VarType};
+use crate::error::SemanticError;
 
 
 pub struct TypeChecker{
     pub current_scope: ScopeType,
     pub current_type: BasicType,
-    pub func_ret_type: FuncRetType
+    pub func_ret_type: BasicType
 }
 
 impl TypeChecker {
@@ -14,7 +13,7 @@ impl TypeChecker {
         TypeChecker{
             current_scope: ScopeType::Global,
             current_type: BasicType::Null,
-            func_ret_type: FuncRetType::Null
+            func_ret_type: BasicType::Null
         }
     }
 
@@ -76,7 +75,7 @@ impl TypeChecker {
     }
 
     pub fn check_ret_type(&self, type_t: BasicType) -> Result<(), SemanticError>{
-        if FuncRetType::from(type_t) == self.func_ret_type {
+        if type_t == self.func_ret_type {
             Ok(())
         } else {
             Err(SemanticError::TypeError{
@@ -109,10 +108,10 @@ impl TypeChecker {
 
     // This is used to check the struct field.
     // When accessing a struct field, it is ensured that the field is defined in the struct.
-    pub fn check_struct_field(&self, field_name: String, fields: Vec<(String, VarType)>) -> Result<VarType, SemanticError>{
+    pub fn check_struct_field(&self, field_name: &String, fields: &Vec<(String, VarType)>) -> Result<VarType, SemanticError>{
         for (name, var) in fields {
             if name == field_name {
-                return Ok(var);
+                return Ok(var.clone());
             }
         }
         return Err(SemanticError::ImproperUsageError{
@@ -122,51 +121,8 @@ impl TypeChecker {
         });
     }
 
-    // This is used when doing member assignments.
-    // var_type represents the type of the struct variable.
-    pub fn check_member_reference(&mut self, var_type: VarType, members: Vec<(String, String, Vec<usize>)>) -> Result<VarType, SemanticError> {
-        let mut current_type = var_type;
-        let mut struct_fields = match current_type {
-            VarType::Struct((_, ref fields)) => fields,
-            _ => return Err(SemanticError::ImproperUsageError{
-                id: 13,
-                message: "Accessing a member of a non-structure variable".to_string(),
-                line: 0
-            })
-        };
-        let mut members_count = members.len();
-        for (_, member_name, dim_indices) in members {
-
-            let field = self.check_struct_field(member_name, struct_fields.clone())?;
-            current_type = self.check_type(field, dim_indices)?;
-
-            if members_count == 0 {
-                return Ok(current_type);
-            }
-            
-            members_count -= 1;
-            match current_type {
-                VarType::Struct((_, ref fields)) => {
-                    struct_fields = fields;
-                }
-                _ => {
-                    if members_count != 0 {
-                        return Err(SemanticError::ImproperUsageError{
-                            id: 13,
-                            message: "Accessing a member of a non-structure variable".to_string(),
-                            line: 0
-                        });
-                    } else {
-                        return Ok(current_type);
-                    }
-                }
-            }
-        }
-        Ok(current_type)
-    }
-
     // This is used to check the type (if it is an array) and the indices.
-    pub fn check_type(&self, var_type: VarType, reference: Vec<usize>) -> Result<VarType, SemanticError> {
+    pub fn check_type(&self, var_type: VarType, reference: &Vec<usize>) -> Result<VarType, SemanticError> {
         match var_type {
             VarType::Array((basic_type, dims)) => {
                 let num_indices = reference.len();
@@ -193,9 +149,16 @@ impl TypeChecker {
                     let remaining_dims = dims[num_indices..].to_vec();
                     return Ok(VarType::Array((basic_type, remaining_dims)));
                 }
-            }
-            _ => {
-                return Ok(var_type);
+            },
+            VarType::Primitive(basic_type) => {
+                if reference.len() > 0 {
+                    return Err(SemanticError::ImproperUsageError{
+                        id: 22,
+                        message: "Accessing an index of a non-array variable".to_string(),
+                        line: 0
+                    });
+                }
+                return Ok(VarType::Primitive(basic_type));
             }
         }
     }
@@ -216,19 +179,11 @@ impl TypeChecker {
     }
 
     pub fn set_ret_type(&mut self, t: BasicType){
-        match t {
-            BasicType::Int => self.func_ret_type = FuncRetType::Int,
-            BasicType::Float => self.func_ret_type = FuncRetType::Float,
-            BasicType::Char => self.func_ret_type = FuncRetType::Char,
-            BasicType::Bool => self.func_ret_type = FuncRetType::Bool,
-            BasicType::Null => self.func_ret_type = FuncRetType::Void,
-            BasicType::Struct => self.func_ret_type = FuncRetType::Void,
-            BasicType::String => self.func_ret_type = FuncRetType::String,
-        }
+        self.func_ret_type = t;
     }
 
     pub fn reset_ret_type(&mut self){
-        self.func_ret_type = FuncRetType::Null
+        self.func_ret_type = BasicType::Null;
     }
 }
 
@@ -237,29 +192,4 @@ pub enum ScopeType {
     Global,
     Func,
     LoopExpr
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum FuncRetType {
-	Int,
-	Char,
-	Float,
-	Bool,
-	String,
-	Void,
-    Null
-}
-
-impl fmt::Display for FuncRetType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            FuncRetType::Int => write!(f, "Int"),
-            FuncRetType::Char => write!(f, "Char"),
-            FuncRetType::Float => write!(f, "Float"),
-            FuncRetType::Bool => write!(f, "Bool"),
-            FuncRetType::String => write!(f, "String"),
-            FuncRetType::Void => write!(f, "Void"),
-            FuncRetType::Null => write!(f, "Null"),
-        }
-    }
 }

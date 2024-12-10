@@ -20,9 +20,6 @@ impl Display for VarType {
             },
             VarType::Array(array_type) => {
                 write!(f, "Array: {:?}", array_type)
-            },
-            VarType::Struct(struct_type) => {
-                write!(f, "Struct: {:?}", struct_type)
             }
         }
     }

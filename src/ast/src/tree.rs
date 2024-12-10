@@ -24,21 +24,22 @@ pub enum Statement {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Variable {
-    // The last one is for the dimension list, if null than a value only.
-    // (identifier, values, dimensions)
-    // Variable can be used to declare a variable or reference a variable.
+    // VarAssignment allows only for VarReference and StructReference.
+    VarAssignment(Box<Variable>, Box<CompExpr>),
+
     // Variable can be a single value or an array.
+    // The last one is for the dimension list, if null than a value only.
+    // (identifier, dimensions)
     VarReference(Box<String>, Box<Vec<CompExpr>>), // varname, offsets
     VarDeclaration(Box<String>, Box<Value>, Box<Vec<CompExpr>>), // varname, type, offsets
-    VarAssignment(Box<Variable>, Box<CompExpr>, Box<Vec<CompExpr>>),
-    // VarAssignment allows only for VarReference and StructReference.
-
+    
     // Struct definition and declaration
     StructDefinition(Box<String>, Box<Vec<Variable>>),
     StructDeclaration(Box<String>, Box<String>, Box<Vec<CompExpr>>),
-    StructReference(Box<Vec<Variable>>),// Struct Reference accepts a recursive call of VarReference
+    // Struct Reference accepts a recursive call of VarReference
     // The first represents the struct variable name and the others are member fields.
-
+    StructReference(Box<Vec<Variable>>),
+    
     // Function Parameter
     FormalParameter(Box<String>, Box<Value>, Box<Vec<usize>>),
     Error
