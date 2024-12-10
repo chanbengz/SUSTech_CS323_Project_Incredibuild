@@ -42,10 +42,10 @@ impl fmt::Display for Variable {
                 ident,
                 value,
                 dims.iter().map(|d| d.to_string()).collect::<Vec<String>>().join(", ")),
-            Variable::VarReference(ident, dims) => write!(f, "{}{}", ident, 
-                dims.iter().map(|d| format!("[{}]", d)).collect::<Vec<String>>().join("")),
-            Variable::VarAssignment(ident, expr, dims) => write!(f, "Variable Assignment: {}{} = {}", ident, 
-                dims.iter().map(|d| format!("[{}]", d)).collect::<Vec<String>>().join(""), expr),
+            Variable::VarReference(ident, dims) => write!(f, "{}{}", 
+                ident, dims.iter().map(|d| format!("[{}]", d)).collect::<Vec<String>>().join("][")),
+            Variable::VarAssignment(ident, expr) => write!(f, "Variable Assignment: {} = {}", 
+                ident, expr),
             Variable::StructDefinition(ident, vars) => write!(f, "Struct Definition: {} with [{}]",
                 ident, 
                 vars.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", ")),
@@ -53,12 +53,13 @@ impl fmt::Display for Variable {
                 ident, 
                 parent, 
                 vars.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", ")),
-            Variable::StructAssignment(var, expr) => write!(f, "Struct Assignment: {} = {}",
-                var.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", "), expr),
-            Variable::MemberReference(ident, member, dims) => write!(f, "Member Reference: {}.{}{}", ident, member,
-                dims.iter().map(|d| format!("[{}]", d)).collect::<Vec<String>>().join("")),
             Variable::StructReference(vars) => write!(f, "Struct Reference: [{}]",
-                vars.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", ")),
+                vars.iter().map(|v| {
+                    match v {
+                        Variable::VarReference(ident, dims) => format!("{}{}", ident, dims.iter().map(|d| format!("[{}]", d)).collect::<Vec<String>>().join("][")),
+                        _ => format!("{}", v),
+                    }
+                }).collect::<Vec<String>>().join(", ")),
             Variable::Error => write!(f, "[VariableError]"),
         }
     }
@@ -112,7 +113,7 @@ impl fmt::Display for Value {
             Value::String(s) => write!(f, "{}: String", s),
             Value::Char(c) => write!(f, "{}: char", c),
             Value::Bool(b) => write!(f, "{}: bool", b),
-            Value::Struct(s) => write!(f, "Struct: {}", s),
+            Value::Struct(s) => write!(f, "Struct({})", s),
             Value::Null => write!(f, "null")
         }
     }

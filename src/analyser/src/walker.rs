@@ -158,19 +158,68 @@ impl Walker {
             Some(dim)
         }
     }
+
+    // This is used when doing member assignments.
+    // var_type represents the type of the struct variable.
+    fn handle_member_reference(&mut self, var_type: StructType, members: Vec<(String, Vec<usize>)>) -> Option<VarType> {
+        let mut current_type = VarType::Primitive(BasicType::Struct(var_type.0.clone()));
+        let mut struct_fields = var_type.1;
+
+        let mut members_count = members.len();
+
+        for (member_name, dim_indices) in members {
+            let field = self.typer.check_struct_field(&member_name, &struct_fields).map_err(|err| {
+                self.errors.add_error(err);
+            }).ok()?;
+            current_type = self.typer.check_type(field, &dim_indices).map_err(|err| {
+                self.errors.add_error(err);
+            }).ok()?;
+
+            if members_count == 0 {
+                return Some(current_type);
+            }
+            
+            members_count -= 1;
+            let current_type_clone = current_type.clone();
+            match current_type_clone {
+                VarType::Primitive(BasicType::Struct(obj)) => {
+                    let result = self.symbol_tables.get_struct(&obj).map_err(|err| {
+                        self.errors.add_error(err);
+                    }).ok()?;
+                    let fields = result.1.clone();
+                    struct_fields = fields;
+                }
+                _ => {
+                    if members_count != 0 {
+                        self.errors.add_error(SemanticError::ImproperUsageError {
+                            id: 13,
+                            message: "Invalid Member Reference.".to_owned(),
+                            line: 0
+                        });
+                        return None;
+                    } else {
+                        return Some(current_type);
+                    }
+                }
+            }
+        }
+        Some(current_type)
+    }
     
     fn traverse_variable(&mut self, variable: &Variable) -> Option<VarType> {
         match variable {
             Variable::VarReference(name, dimensions) => {
                 println!("VarReference: {:?}, Dimensions: {:?}", name, dimensions);
                 let dim = self.handle_dimensions(*dimensions.clone())?;
+
                 let symbol = self.symbol_tables.get_var_symbol(name).map_err(|err| {
                     self.errors.add_error(err);
                 }).ok()?;
 
-                let var_type = self.typer.check_type(symbol.symbol_type.clone(), dim).map_err(|err| {
+                let var_type = self.typer.check_type(symbol.symbol_type.clone(), &dim).map_err(|err| {
                     self.errors.add_error(err);
                 }).ok()?;
+
                 Some(var_type)
             }
             
@@ -200,20 +249,12 @@ impl Walker {
                 }
             }
             
-            Variable::VarAssignment(name, value, dimensions) => {
-                println!("VarAssignment: {:?}, Value: {:?}, Dimensions: {:?}", name, value, dimensions);
+            Variable::VarAssignment(var, val) => {
+                println!("VarAssignment: {:?}, Value: {:?}", var, val);
                 // Calculate the type of right hand side
-                let right_type = self.traverse_comp_expr(value)?;
+                let right_type = self.traverse_comp_expr(val)?;
 
-                let dim = self.handle_dimensions(*dimensions.clone())?;
-
-                let symbol = self.symbol_tables.get_var_symbol(name).map_err(|err| {
-                    self.errors.add_error(err);
-                }).ok()?;
-
-                let left_type = self.typer.check_type(symbol.symbol_type.clone(), dim).map_err(|err| {
-                    self.errors.add_error(err);
-                }).ok()?;
+                let left_type = self.traverse_variable(var)?;
 
                 match self.typer.check_assign_operation(left_type, right_type) {
                     Ok(t) => Some(t),
@@ -244,16 +285,28 @@ impl Walker {
             // Define a variable
             // First check if the struct exists
             // Then check if the variable is valid
-            Variable::StructDeclaration(obj_type, name, _) => {
+            Variable::StructDeclaration(obj_type, name, dim) => {
+                let dimensions = self.handle_dimensions(*dim.clone()).unwrap_or(Vec::new());
+
                 match self.symbol_tables.get_struct(obj_type) {
                     Ok(struct_type) => {
                         let new_symbol = self.manager.new_var_symbol(
                             *name.clone(), 
-                            VarType::Struct(struct_type.clone()), 
+                            if dimensions.is_empty() {
+                                VarType::Primitive(BasicType::Struct(struct_type.0.clone()))
+                            } else {
+                                VarType::Array((BasicType::Struct(struct_type.0.clone()), dimensions.clone()))
+                            },
                             false,
                         );
                         match self.symbol_tables.define_var_symbol(new_symbol) {
-                            Ok(()) => Some(VarType::Struct(struct_type.clone())),
+                            Ok(()) => Some(
+                                if dimensions.is_empty() {
+                                    VarType::Primitive(BasicType::Struct(struct_type.0.clone()))
+                                } else {
+                                    VarType::Array((BasicType::Struct(struct_type.0.clone()), dimensions.clone()))
+                                }
+                            ),
                             Err(err) => {
                                 self.errors.add_error(err);
                                 None
@@ -265,46 +318,56 @@ impl Walker {
                     }
                 }
             }
-
-            // TODO: Define a variable
-            // First check if the struct exists
-            // Then check if the variable is valid
-            Variable::StructAssignment(member, value) => {
-                println!("StructAssignment: Member: {:?} Value: {:?}", member, value);
-                // Check the type of the assigned value
-                let left_type = self.traverse_variable(&**member)?;
-                let right_type = self.traverse_comp_expr(&**value)?;
-                match self.typer.check_assign_operation(left_type, right_type) {
-                    Ok(t) => Some(t),
-                    Err(err) => {
-                        self.errors.add_error(err);
-                        None
-                    }
-                }
-            }
-            Variable::MemberReference(members) => {
-                println!("MemberReference: {:?}", members);
-                if members.is_empty() {
+            Variable::StructReference(vars) => {
+                if vars.is_empty() {
                     return None;
                 }
+                // The first var reference is the reference for the struct variables
+                let struct_var = match vars[0].clone() {
+                    Variable::VarReference(name, dimension) => {
+                        let dim = self.handle_dimensions(*dimension).unwrap_or(Vec::new());
+                        (*name, dim)
+                    },
+                    _ => return None
+                };
+
+                let struct_symbol = self.symbol_tables.get_var_symbol(&struct_var.0).map_err(|err| {
+                        self.errors.add_error(err);
+                }).ok()?; 
                 
-                let mems: Vec<(String, String, Vec<usize>)> = members.clone().iter_mut().map(|(form_name, field_name, dimensions,)|{
-                    (*form_name.clone(), *field_name.clone(), self.handle_dimensions(*dimensions.clone()).unwrap_or(Vec::new()))
-                }).collect::<Vec<(String, String, Vec<usize>)>>();
-                
-                let symbol = self.symbol_tables.get_var_symbol(&mems[0].0).map_err(|err| {
+                let mut var_type = struct_symbol.symbol_type.clone(); // BasicType Struct or Array
+
+                var_type = self.typer.check_type(var_type, &struct_var.1).map_err(|err| {
                     self.errors.add_error(err);
                 }).ok()?;
 
-                match self.typer.check_member_reference(symbol.symbol_type.clone(), mems) {
-                    Ok(t) => Some(t),
-                    Err(err) => {
-                        self.errors.add_error(err);
-                        None
+                // The rest of the var references are the struct members
+                let members = vars[1..].iter().map(|v|
+                    match v {
+                        Variable::VarReference(name, dimensions) => {
+                            let dim = self.handle_dimensions(*dimensions.clone()).unwrap_or(Vec::new());
+                            (*name.clone(), dim)
+                        }
+                        _ => {
+                            self.errors.add_error(SemanticError::ImproperUsageError {
+                                id: 13,
+                                message: "Invalid Member Reference.".to_owned(),
+                                line: 0
+                            });
+                            ("".to_owned(), Vec::new())
+                        }
                     }
+                ).collect::<Vec<(String, Vec<usize>)>>();
+
+                if let VarType::Primitive(BasicType::Struct(ref obj)) = var_type {
+                    let struct_type = self.symbol_tables.get_struct(obj)
+                        .map_err(|err| self.errors.add_error(err))
+                        .ok()?;
+                    self.handle_member_reference(struct_type, members)
+                } else {
+                    None
                 }
-            },
-            
+            }
             Variable::FormalParameter(name, values, dimensions) => {
                 println!("FormalParameter: {:?}, Values: {:?}, Dimensions: {:?}", name, values, dimensions);
                 let symbol_type = BasicType::from(*values.clone());
@@ -346,10 +409,16 @@ impl Walker {
                 };
                 var
             }
-            Variable::StructDeclaration(type_t, identifier, _) => {
+            Variable::StructDeclaration(type_t, identifier, dim) => {
+                let dimensions = self.handle_dimensions(*dim.clone()).unwrap_or(Vec::new());
                 match self.symbol_tables.get_struct(type_t) {
                     Ok(struct_type) => {
-                        Some((*identifier.clone(), VarType::Struct(struct_type.clone())))
+                        let var_type = if dimensions.is_empty() {
+                            VarType::Primitive(BasicType::Struct(struct_type.0.clone()))
+                        } else {
+                            VarType::Array((BasicType::Struct(struct_type.0.clone()), dimensions))
+                        };
+                        Some((*identifier.clone(), var_type))
                     }
                     Err(err) => {
                         self.errors.add_error(err);

@@ -28,22 +28,22 @@ pub type FuncSymbol = Symbol<FuncType>;
 #[derive(Clone, Debug)]
 pub enum VarType {
 	Primitive(PrimType),
-	Array(ArrayType),
-	Struct(StructType)
+	Array(ArrayType)
 }
 
+// Array(BasicType::Struct, Vec<usize>: len 0) is equal to BasicType::Struct 
 pub type PrimType = BasicType;
 pub type ArrayType = (BasicType, Vec<usize>);
 pub type StructType = (String, Vec<(String, VarType)>);
 pub type FuncType = (BasicType, Vec<VarType>);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BasicType {
 	Int,
 	Char,
 	Float,
 	Bool,
 	String,
-	Struct,
+	Struct(String),
 	Null
 }
