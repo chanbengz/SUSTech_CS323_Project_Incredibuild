@@ -330,24 +330,11 @@ pub FuncDec: Box<tree::Function> = {
 }
 
 FuncCall: tree::Expr = {
-    <vl:@L> <name:Identifier> "(" ")" ";" <vr:@R> => {
+    <vl:@L> <name:Identifier> "(" <args:ArgList?> ")" ";" <vr:@R>=> {
         tree::Expr::FuncCall(
             tree::Function::FuncReference(
                 Box::new(name),
-                Vec::new()
-            ),
-            Span {
-                source: source.to_string(),
-                start: vl,
-                end: vr
-            }
-        )
-    },
-    <vl:@L> <name:Identifier> "(" <args:ArgList> ")" ";" <vr:@R>=> {
-        tree::Expr::FuncCall(
-            tree::Function::FuncReference(
-                Box::new(name),
-                args
+                args.unwrap_or(Vec::new())
             ),
             Span {
                 source: source.to_string(),
@@ -1197,9 +1184,7 @@ Specifier: tree::Value = {
     <t:"typechar"> => tree::Value::Char(' '),
     <t:"typestr"> => tree::Value::String(String::new()),
     <t:"void"> => tree::Value::Null,
-    "struct" <str: Identifier> => {
-        tree::Value::Struct(str)
-    },
+    "struct" <str: Identifier> => tree::Value::Struct(str)
 }
 
 Term: Box<tree::CompExpr> = {
@@ -1233,38 +1218,17 @@ Term: Box<tree::CompExpr> = {
     "+"? <n: "float"> => Box::new(tree::CompExpr::Value(tree::Value::Float(n))),
     "-"  <n: "float"> => Box::new(tree::CompExpr::Value(tree::Value::Float(-n))),
     <n: "char"> => Box::new(tree::CompExpr::Value(tree::Value::Char(n))),
-
-    <vl:@L> <ident: Identifier> "(" ")" <vr:@R>=> {
+    <vl:@L> <ident: Identifier> "(" <args:ArgList?> ")" <vr:@R>=> {
         Box::new(tree::CompExpr::FuncCall(
-            tree::Function::FuncReference(Box::new(ident), Vec::new())
+            tree::Function::FuncReference(Box::new(ident), args.unwrap_or(Vec::new()))
         ))
     },
-    <vl:@L> <ident: Identifier> "(" <args:ArgList> ")" <vr:@R>=> {
-        Box::new(tree::CompExpr::FuncCall(
-            tree::Function::FuncReference(Box::new(ident), args)
-        ))
-    },
-
     <s:StructRef> => {
         Box::new(tree::CompExpr::Variable(tree::Variable::StructReference(Box::new(s))))
     },
 
     // error recovery
-    <ident: Identifier> "(" <l:@L> <missing:!> <r:@R> => {
-        let error = ErrorRecovery {
-            error: ParseError::User {
-                error: LexicalError::MissingLexeme(Span {
-                    source: source.to_string(),
-                    start: l,
-                    end: l + 1
-                }, "closing parenthesis ')'".to_string())
-            },
-            dropped_tokens: Vec::new(),
-        };
-        errors.push(error);
-        Box::new(tree::CompExpr::MissingRP)
-    },
-    <ident: Identifier> "(" <args:ArgList> <l:@L> <missing:!> <r:@R> => {
+    <ident: Identifier> "(" ArgList? <l:@L> <missing:!> <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
                 error: LexicalError::MissingLexeme(Span {

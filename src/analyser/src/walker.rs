@@ -15,11 +15,12 @@ pub struct Walker {
     pub symbol_tables: ScopeStack,
     pub manager: SymbolManager,
     pub errors: SemanticErrorManager,
-    pub typer: TypeChecker
+    pub typer: TypeChecker,
+    verbose: bool
 }
 
 impl Walker {
-    pub fn new(program_source: &str) -> Walker {
+    pub fn new(program_source: &str, verbose: bool) -> Walker {
         let mut src_content = String::new();
         let mut src_file = File::open(program_source).expect("Unable to open file");
         src_file.read_to_string(&mut src_content).expect("Unable to read file");
@@ -32,7 +33,8 @@ impl Walker {
             manager: SymbolManager::default(),
             errors: SemanticErrorManager::new(),
             symbol_tables: ScopeStack::new(),
-            typer: TypeChecker::new()
+            typer: TypeChecker::new(),
+            verbose
         }
     }
 
@@ -51,28 +53,22 @@ impl Walker {
     pub fn update_line_with_span(&mut self, span: &Span) {
         let lineno = self.program_source[..span.start].lines().count();
         self.errors.update_line_with_value(lineno);
-        // let lineno = if lineno == 0 { 1.to_string() } else { lineno.to_string() };
-        // let begin = self.program_source[..span.start].rfind('\n').unwrap_or(0);
-        // let line_str = self.program_source.lines().nth(lineno.parse::<usize>().unwrap() - 1).unwrap();
-        // let padding = " ".repeat(lineno.len() + 1);
-        // let padding_msg = " ".repeat(span.start - begin);
-        // let bar = "|".purple();
-        // let mut indicator = "^".to_string();
-        // indicator.push_str(&"~".repeat(span.end - span.start - 1));
-        // println!("{} {}:{lineno}:{}: {error_msg}\n{padding}{}\n{} {} {line_str}\n{padding}{}{padding_msg}{}",
-        //          "-->".purple(), span.source, span.start, &bar, lineno.purple(), &bar, bar, indicator.red());
     }
 
     pub fn traverse(&mut self) {
         let program_clone = self.program.clone();
-        println!("===================================Traversing Programs===================================");
+        if self.verbose {
+            println!("===================================Traversing Programs===================================");
+        }
         self.traverse_program(&program_clone);
     }
 
     fn traverse_program(&mut self, program: &Program) {
         match program {
             Program::Program(parts) => {
-                println!("Program");
+                if self.verbose {
+                    println!("Program");
+                }
                 self.update_line();
                 for part in parts {
                     self.traverse_program_part(part);
@@ -87,11 +83,15 @@ impl Walker {
     fn traverse_program_part(&mut self, part: &ProgramPart) {
         match part {
             ProgramPart::Statement(statement) => {
-                println!("Statement");
+                if self.verbose {
+                    println!("Statement");
+                }
                 self.traverse_statement(statement);
             }
             ProgramPart::Function(function) => {
-                println!("Function");
+                if self.verbose {
+                    println!("Function");
+                }
                 self.traverse_function(function);
             }
         }
@@ -100,18 +100,24 @@ impl Walker {
     fn traverse_statement(&mut self, statement: &Statement) {
         match statement {
             Statement::Include(include, span) => {
-                println!("Include: {:?}", include);
+                if self.verbose {
+                    println!("Include: {:?}", include);
+                }
                 self.update_line_with_span(span);
             },
             Statement::GlobalVariable(vars, span) => {
-                println!("Global Variables");
+                if self.verbose {
+                    println!("Global Variables");
+                }
                 self.update_line_with_span(span);
                 for var in vars {
                     self.traverse_variable(var);
                 }
             }
             Statement::Struct(var, span) => {
-                println!("Struct");
+                if self.verbose {
+                    println!("Struct");
+                }
                 self.update_line_with_span(span);
                 self.traverse_variable(var);
             }
@@ -209,7 +215,9 @@ impl Walker {
     fn traverse_variable(&mut self, variable: &Variable) -> Option<VarType> {
         match variable {
             Variable::VarReference(name, dimensions) => {
-                println!("VarReference: {:?}, Dimensions: {:?}", name, dimensions);
+                if self.verbose {
+                    println!("VarReference: {:?}, Dimensions: {:?}", name, dimensions);
+                }
                 let dim = self.handle_dimensions(*dimensions.clone())?;
 
                 let symbol = self.symbol_tables.get_var_symbol(name).map_err(|err| {
@@ -224,7 +232,9 @@ impl Walker {
             }
             
             Variable::VarDeclaration(name, values, dimensions) => {
-                println!("VarDeclaration: {:?}, Values: {:?}, Dimensions: {:?}", name, values, dimensions);
+                if self.verbose {
+                    println!("VarDeclaration: {:?}, Values: {:?}, Dimensions: {:?}", name, values, dimensions);
+                }
                 let dim = self.handle_dimensions(*dimensions.clone())?;
 
                 let symbol_type = BasicType::from(*values.clone());
@@ -250,7 +260,9 @@ impl Walker {
             }
             
             Variable::VarAssignment(var, val) => {
-                println!("VarAssignment: {:?}, Value: {:?}", var, val);
+                if self.verbose {
+                    println!("VarAssignment: {:?}, Value: {:?}", var, val);
+                }
                 // Calculate the type of right hand side
                 let right_type = self.traverse_comp_expr(val)?;
 
@@ -267,7 +279,9 @@ impl Walker {
 
             // Define in the global scope
             Variable::StructDefinition(name, variables) => {
-                println!("StructDefinition: {:?}", name);
+                if self.verbose {
+                    println!("StructDefinition: {:?}", name);
+                }
                 let mut vars: Vec<(String, VarType)> = Vec::new();
                 for var in *variables.clone() {
                     if let Some(var_type) = self.traverse_struct_field(&var) {
@@ -369,7 +383,9 @@ impl Walker {
                 }
             }
             Variable::FormalParameter(name, values, dimensions) => {
-                println!("FormalParameter: {:?}, Values: {:?}, Dimensions: {:?}", name, values, dimensions);
+                if self.verbose {
+                    println!("FormalParameter: {:?}, Values: {:?}, Dimensions: {:?}", name, values, dimensions);
+                }
                 let symbol_type = BasicType::from(*values.clone());
                 let var_type = |dimensions: &[usize]| -> VarType {
                     if !dimensions.is_empty() {
@@ -433,7 +449,9 @@ impl Walker {
     fn traverse_function(&mut self, function: &Function) -> Option<FuncType>{
         match function {
             Function::FuncReference(name, params) => {
-                println!("FuncReference: {:?}, Params: {:?}", name, params);
+                if self.verbose{
+                    println!("FuncReference: {:?}, Params: {:?}", name, params);
+                }
                 let mut args: Vec<VarType> = Vec::new();
                 for param in params {
                     if let Some(arg) = self.traverse_comp_expr(param) {
@@ -458,7 +476,9 @@ impl Walker {
             }
             Function::FuncDeclaration(name, inputs, output, body) => {
                 self.typer.set_ret_type(BasicType::from(*output.clone()));
-                println!("FuncDeclaration: {:?}, Output: {:?}", name, output);
+                if self.verbose {
+                    println!("FuncDeclaration: {:?}, Inputs: {:?}, Output: {:?}", name, inputs, output);
+                }
                 self.symbol_tables.extend_scope();
                 
                 let ret_type: BasicType = BasicType::from(*output.clone());
@@ -499,7 +519,9 @@ impl Walker {
     fn traverse_body(&mut self, body: &Body) {
         match body {
             Body::Body(exprs) => {
-                println!("Body");
+                if self.verbose {
+                    println!("Body");
+                }
                 self.symbol_tables.extend_scope();
                 for expr in exprs {
                     self.traverse_expr(expr);
@@ -518,29 +540,39 @@ impl Walker {
     fn traverse_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::If(if_expr, span) => {
-                println!("If Expression");
+                if self.verbose {
+                    println!("If Expression");
+                }
                 self.update_line_with_span(span);
                 self.traverse_if(if_expr);
             }
             Expr::Loop(loop_expr, span) => {
-                println!("Loop Expression");
+                if self.verbose {
+                    println!("Loop Expression");
+                }
                 self.update_line_with_span(span);
                 self.traverse_loop(loop_expr);
             }
             Expr::VarManagement(vars, span) => {
-                println!("VarManagement");
+                if self.verbose {
+                    println!("VarManagement");
+                }
                 self.update_line_with_span(span);
                 for var in vars {
                     self.traverse_variable(var);
                 }
             }
             Expr::FuncCall(function, span) => {
-                println!("Function Call");
+                if self.verbose {
+                    println!("Function Call");
+                }
                 self.update_line_with_span(span);
                 self.traverse_function(function);
             }
             Expr::Break(span) => {
-                println!("Break");
+                if self.verbose {
+                    println!("Break");
+                }
                 self.update_line_with_span(span);
                 if self.typer.get_scope() != ScopeType::LoopExpr{
                     self.errors.add_error(SemanticError::ImproperUsageError { 
@@ -551,7 +583,9 @@ impl Walker {
                 }
             },
             Expr::Continue(span) => {
-                println!("Continue");
+                if self.verbose {
+                    println!("Continue");
+                }
                 self.update_line_with_span(span);
                 if self.typer.get_scope() != ScopeType::LoopExpr{
                     self.errors.add_error(SemanticError::ImproperUsageError { 
@@ -562,7 +596,9 @@ impl Walker {
                 }
             },
             Expr::Return(comp_expr, span) => {
-                println!("Return");
+                if self.verbose {
+                    println!("Return");
+                }
                 self.update_line_with_span(span);
                 match self.traverse_comp_expr(comp_expr) {
                     Some(t) => {
@@ -578,7 +614,9 @@ impl Walker {
                 }
             }
             Expr::Body(body, span) => {
-                println!("Body");
+                if self.verbose {
+                    println!("Body");
+                }
                 self.update_line_with_span(span);
                 self.traverse_body(body);
             }
@@ -589,12 +627,16 @@ impl Walker {
     fn traverse_if(&mut self, if_expr: &If) {
         match if_expr {
             If::IfExpr(cond, body) => {
-                println!("IfExpr");
+                if self.verbose {
+                    println!("IfExpr");
+                }
                 self.traverse_cond_expr(cond);
                 self.traverse_body(body);
             }
             If::IfElseExpr(cond, then_body, else_body) => {
-                println!("IfElseExpr");
+                if self.verbose {
+                    println!("IfElseExpr");
+                }
                 self.traverse_cond_expr(cond);
                 self.traverse_body(then_body);
                 self.traverse_body(else_body);
@@ -606,7 +648,9 @@ impl Walker {
     fn traverse_loop(&mut self, loop_expr: &Loop) {
         match loop_expr {
             Loop::WhileExpr(cond, body) => {
-                println!("WhileExpr");
+                if self.verbose {
+                    println!("WhileExpr");
+                }
                 self.traverse_cond_expr(cond);
                 
                 let prev_scope = self.typer.set_scope(ScopeType::LoopExpr);
@@ -614,7 +658,9 @@ impl Walker {
                 self.typer.set_scope(prev_scope);
             }
             Loop::ForExpr(init, cond, increment, body) => {
-                println!("ForExpr");
+                if self.verbose {
+                    println!("ForExpr");
+                }
                 self.traverse_expr(init);
                 self.traverse_cond_expr(cond);
                 self.traverse_expr(increment);
@@ -633,11 +679,15 @@ impl Walker {
                 return Some(BasicType::Bool)
             },
             CondExpr::UnaryCondition(op, expr) => {
-                println!("UnaryCondition: {:?}", op);
+                if self.verbose {
+                    println!("UnaryCondition: {:?}", op);
+                }
                 self.traverse_cond_expr(expr)
             }
             CondExpr::BinaryCondition(lhs, op, rhs) => {
-                println!("BinaryCondition: {:?} {:?} {:?}", lhs, op, rhs);
+                if self.verbose {
+                    println!("BinaryCondition: {:?} {:?} {:?}", lhs, op, rhs);
+                }
                 let left_type = self.traverse_cond_expr(lhs)?;
                 let right_type = self.traverse_cond_expr(rhs)?;
                 match self.typer.check_binary_operations(VarType::Primitive(left_type), VarType::Primitive(right_type)) {
@@ -649,7 +699,9 @@ impl Walker {
                 }
             }
             CondExpr::Condition(lhs, op, rhs) => {
-                println!("Condition: {:?} {:?} {:?}", lhs, op, rhs);
+                if self.verbose {
+                    println!("Condition: {:?} {:?} {:?}", lhs, op, rhs);
+                }
                 let left_type = self.traverse_comp_expr(lhs)?;
                 let right_type = self.traverse_comp_expr(rhs)?;
                 match self.typer.check_condition(left_type, right_type) {
@@ -667,20 +719,28 @@ impl Walker {
     fn traverse_comp_expr(&mut self, comp: &CompExpr) -> Option<VarType> {
         match comp {
             CompExpr::Value(value) => {
-                println!("Value: {:?}", value);
+                if self.verbose {
+                    println!("Value: {:?}", value);
+                }
                 return Some(VarType::Primitive(BasicType::from(value.clone())));
             },
             CompExpr::Variable(variable) => {
-                println!("Variable: {:?}", variable);
+                if self.verbose {
+                    println!("Variable: {:?}", variable);
+                }
                 return self.traverse_variable(variable);
             }
             CompExpr::FuncCall(function) => {
-                println!("Function Call");
+                if self.verbose {
+                    println!("Function Call");
+                }
                 let func_type = self.traverse_function(function)?;
                 return Some(VarType::Primitive(func_type.0));
             }
             CompExpr::UnaryOperation(op, expr) => {
-                println!("UnaryOperation: {:?}", op);
+                if self.verbose {
+                    println!("UnaryOperation: {:?}", op);
+                }
                 let expr_type = self.traverse_comp_expr(expr)?;
                 if let VarType::Primitive(BasicType::Bool) = expr_type {
                     Some(VarType::Primitive(BasicType::Bool))
@@ -694,7 +754,9 @@ impl Walker {
                 }
             }
             CompExpr::BinaryOperation(lhs, op, rhs) => {
-                println!("BinaryOperation: {:?} {:?} {:?}", lhs, op, rhs);
+                if self.verbose {
+                    println!("BinaryOperation: {:?} {:?} {:?}", lhs, op, rhs);
+                }
                 let left_type = self.traverse_comp_expr(lhs)?;
                 let right_type = self.traverse_comp_expr(rhs)?;
                 match self.typer.check_binary_operations(left_type, right_type) {

@@ -26,7 +26,7 @@ C-like Compiler in Rust
 ```
 .
 ├── Cargo.toml # Add your sub-project in the [workspace] members field.
-├── Dockerfile
+├── Dockerfile # Build the environment for the project
 ├── docs
 │   ├── cs323-project-tutorial1.pdf
 │   ├── cs323-project-tutorial2.pdf
@@ -43,6 +43,9 @@ C-like Compiler in Rust
 │   ├── ast
 │   │   ├── Cargo.toml # Define your dependencies in the sub-project
 │   │   └── src # In lib.rs please pub mod all the crates.
+│   ├── irgen
+│   │   ├── Cargo.toml
+│   │   └── src
 │   ├── lexer
 │   │   ├── Cargo.lock
 │   │   ├── Cargo.toml
@@ -56,7 +59,8 @@ C-like Compiler in Rust
 │       ├── phase1
 │       ├── phase2
 │       ├── phase3
-│       ├── test_0_r00.out
+│       ├── test_0_r00.out # Minimal testcase
+│       ├── test_0_r00.ll # LLVM IR of the minimal testcase
 │       └── test_0_r00.spl
 └── target
     ├── CACHEDIR.TAG

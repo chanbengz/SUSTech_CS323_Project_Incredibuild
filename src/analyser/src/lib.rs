@@ -22,7 +22,7 @@ mod tests {
             .expect("Unable to read file");
         let expected = out_content.trim();
 
-        let mut walker = Walker::new(file_path);
+        let mut walker = Walker::new(file_path, true);
 
         walker.traverse();
         let _table = walker.get_tables();

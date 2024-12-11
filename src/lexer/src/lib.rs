@@ -278,6 +278,7 @@ mod test {
                 (RightBrace, "}"),
                 (RightBrace, "}"),
                 (KeywordReturn, "return"),
+                (Identifier(String::from("a")), "a"),
                 (Semicolon, ";"),
                 (RightBrace, "}"),
             ][..]
