@@ -240,7 +240,7 @@ mod test {
 
     #[test]
     fn synthesis_test() {
-        let file_path = "../test/test_0_r00.spl";
+        let file_path = "../../test/test_0_r00.spl";
 
         assert_lex_from_file(
             file_path,

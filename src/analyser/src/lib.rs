@@ -36,11 +36,9 @@ mod tests {
     #[test]
     fn test_phase2(){
         for i in 1..16 {
-            if i == 6 {
-                continue;
-            }
-            let in_path = format!("../test/phase2/test_2_r{:0>2}.spl", i);
-            let out_path = format!("../test/phase2/test_2_r{:0>2}.out", i);
+            if i == 6 { continue; }
+            let in_path = format!("../../test/phase2/test_2_r{:0>2}.spl", i);
+            let out_path = format!("../../test/phase2/test_2_r{:0>2}.out", i);
             assert_analyze_from_file(&in_path, &out_path);
         }
     }
@@ -48,8 +46,8 @@ mod tests {
     #[test]
     fn test_self_defined(){
         for i in 1..4 {
-            let in_path = format!("../test/phase2/self_def_s{:0>2}.spl", i);
-            let out_path = format!("../test/phase2/self_def_s{:0>2}.out", i);
+            let in_path = format!("../../test/phase2/self_def_s{:0>2}.spl", i);
+            let out_path = format!("../../test/phase2/self_def_s{:0>2}.out", i);
             assert_analyze_from_file(&in_path, &out_path);
         }
     }

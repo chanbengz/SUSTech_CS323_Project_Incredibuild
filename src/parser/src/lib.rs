@@ -225,24 +225,22 @@ mod tests {
 
     #[test]
     fn test_0_r00() {
-        assert_parse_from_file(Parser::FuncDecParser, "../test/test_0_r00.spl","../test/test_0_r00.out");
+        assert_parse_from_file(Parser::FuncDecParser, "../../test/test_0_r00.spl","../../test/test_0_r00.out");
     }
 
     #[test]
     fn test_phase1() {
         for i in 1..13 {
             assert_parse_from_file(Parser::ProgramParser, 
-                &format!("../test/phase1/basic/test_1_r{:0>2}.spl", i),
-                &format!("../test/phase1/basic/test_1_r{:0>2}.out", i)
+                &format!("../../test/phase1/basic/test_1_r{:0>2}.spl", i),
+                &format!("../../test/phase1/basic/test_1_r{:0>2}.out", i)
             );
         }
         for i in 1..14 {
-            if i == 7 || i == 8 {
-                continue;
-            }
+            if i == 7 || i == 8 { continue; } // skip "no-if-before-else" and "invalid statement"
             assert_parse_from_file(Parser::ProgramParser,
-                &format!("../test/phase1/extra/test_1_s{:0>2}.spl", i),
-                &format!("../test/phase1/extra/test_1_s{:0>2}.out", i)
+                &format!("../../test/phase1/extra/test_1_s{:0>2}.spl", i),
+                &format!("../../test/phase1/extra/test_1_s{:0>2}.out", i)
             );
         }
     }

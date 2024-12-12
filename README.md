@@ -38,11 +38,11 @@ C-like Compiler in Rust
 ├── README.md
 ├── src
 │   ├── analyser
-│   │   ├── Cargo.toml
-│   │   └── src
-│   ├── ast
 │   │   ├── Cargo.toml # Define your dependencies in the sub-project
 │   │   └── src # In lib.rs please pub mod all the crates.
+│   ├── ast
+│   │   ├── Cargo.toml
+│   │   └── src
 │   ├── irgen
 │   │   ├── Cargo.toml
 │   │   └── src
@@ -51,24 +51,17 @@ C-like Compiler in Rust
 │   │   ├── Cargo.toml
 │   │   └── src
 │   ├── main.rs
-│   ├── parser
-│   │   ├── build.rs # lalrpop parser generator
-│   │   ├── Cargo.toml # When including your mod please add relevant path
-│   │   └── src
-│   └── test
-│       ├── phase1
-│       ├── phase2
-│       ├── phase3
-│       ├── test_0_r00.out # Minimal testcase
-│       ├── test_0_r00.ll # LLVM IR of the minimal testcase
-│       └── test_0_r00.spl
-└── target
-    ├── CACHEDIR.TAG
-    └── debug
-        ├── build
-        ├── deps
-        ├── examples
-        └── incremental
+│   └── parser
+│       ├── build.rs # lalrpop parser generator
+│       ├── Cargo.toml
+│       └── src
+└── test
+    ├── phase1 # Lexical & Syntax
+    ├── phase2 # Semantic
+    ├── phase3 # LLVM IR Generation
+    ├── test_0_r00.out # Minimal testcase
+    ├── test_0_r00.ll # LLVM IR of the minimal testcase
+    └── test_0_r00.spl
 ```
 
 ## Testing

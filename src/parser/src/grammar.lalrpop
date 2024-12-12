@@ -1218,6 +1218,7 @@ Term: Box<tree::CompExpr> = {
     "+"? <n: "float"> => Box::new(tree::CompExpr::Value(tree::Value::Float(n))),
     "-"  <n: "float"> => Box::new(tree::CompExpr::Value(tree::Value::Float(-n))),
     <n: "char"> => Box::new(tree::CompExpr::Value(tree::Value::Char(n))),
+    <n: "string"> => Box::new(tree::CompExpr::Value(tree::Value::String(n))),
     <vl:@L> <ident: Identifier> "(" <args:ArgList?> ")" <vr:@R>=> {
         Box::new(tree::CompExpr::FuncCall(
             tree::Function::FuncReference(Box::new(ident), args.unwrap_or(Vec::new()))
