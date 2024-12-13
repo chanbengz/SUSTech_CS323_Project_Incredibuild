@@ -36,7 +36,7 @@ impl EmitError for LexicalError {
         let mut indicator = "^".to_string();
         indicator.push_str(&"~".repeat(span.end - span.start - 1));
         println!("{} {}:{lineno}:{}: {error_msg}\n{padding}{}\n{} {} {line_str}\n{padding}{}{padding_msg}{}",
-                 "-->".purple(), span.source, span.start, &bar, lineno.purple(), &bar, bar, indicator.red());
+                 "-->".purple(), span.source, span.start - begin, &bar, lineno.purple(), &bar, bar, indicator.red());
     }
 }
 

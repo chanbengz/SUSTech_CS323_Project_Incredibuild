@@ -2,7 +2,7 @@
 
 # SUSTech CS323 Project: Incredibuild
 
-C-like Compiler in Rust
+SPL(SUSTech Programming Language) Compiler in Rust
 
 </div>
 
@@ -13,7 +13,7 @@ C-like Compiler in Rust
 
 - [x] SPL Grammar:
     - [x] Lexer & Parser
-    - [x] Semantic Analyzer
+    - [x] Semantic Analyser
     - [ ] Macro
 - [ ] LLVM IR Generation
 - [ ] Optimization
@@ -38,11 +38,11 @@ C-like Compiler in Rust
 ├── README.md
 ├── src
 │   ├── analyser
-│   │   ├── Cargo.toml
-│   │   └── src
-│   ├── ast
 │   │   ├── Cargo.toml # Define your dependencies in the sub-project
 │   │   └── src # In lib.rs please pub mod all the crates.
+│   ├── ast
+│   │   ├── Cargo.toml
+│   │   └── src
 │   ├── irgen
 │   │   ├── Cargo.toml
 │   │   └── src
@@ -51,24 +51,18 @@ C-like Compiler in Rust
 │   │   ├── Cargo.toml
 │   │   └── src
 │   ├── main.rs
-│   ├── parser
-│   │   ├── build.rs # lalrpop parser generator
-│   │   ├── Cargo.toml # When including your mod please add relevant path
-│   │   └── src
-│   └── test
-│       ├── phase1
-│       ├── phase2
-│       ├── phase3
-│       ├── test_0_r00.out # Minimal testcase
-│       ├── test_0_r00.ll # LLVM IR of the minimal testcase
-│       └── test_0_r00.spl
-└── target
-    ├── CACHEDIR.TAG
-    └── debug
-        ├── build
-        ├── deps
-        ├── examples
-        └── incremental
+│   └── parser
+│       ├── build.rs # lalrpop parser generator
+│       ├── Cargo.toml
+│       └── src
+└── test
+    ├── phase1 # Lexical & Syntax
+    ├── phase2 # Semantic
+    ├── phase3 # LLVM IR Generation
+    ├── phase4 # Binary Generation
+    ├── test_0_r00.spl # Minimal testcase
+    ├── test_0_r00.ll  # LLVM IR of the minimal testcase
+    └── test_0_r00.out # Sample output
 ```
 
 ## Testing
@@ -102,8 +96,19 @@ docker run -it --rm -v $(pwd):/incredibuild incredibuild
 cargo run
 ```
 
+### "Bare Metal" Mac
+
+Make sure you have Rust and Cargo installed. Install LLVM environment by
+
+```bash
+brew install llvm # or use the package manager you prefer
+
+# find where llvm is installed, for example
+export LLVM_SYS_170_PREFIX=/opt/homebrew/Cellar/llvm/19.1.2 # pretend to be LLVM@17 :)
+```
+
 ## Issue
-If you face network issue, there'are two methods to fix it.
+If you face network issue, luckily you can find two ways out.
 
 1. Modify `/etc/systemd/system/docker.service.d/http-proxy.conf` to add proxy.
 
@@ -130,6 +135,10 @@ If you face network issue, there'are two methods to fix it.
 
 ## Reference
 
+Our presentation slides are available [here](https://chanbengz.github.io/slides/compilers-demo) (Chinese)
+
+Acknowledgement:
 - [llvm@17](https://llvm.org/)
 - [lalrpop](https://github.com/lalrpop/lalrpop)
 - [Logos](https://github.com/maciejhirsz/logos)
+- [inkwell](https://github.com/TheDan64/inkwell)

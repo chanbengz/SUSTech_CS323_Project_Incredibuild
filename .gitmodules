@@ -1,0 +1,3 @@
+[submodule "docs/slides"]
+	path = docs/slides
+	url = git@github.com:chanbengz/slides.git
