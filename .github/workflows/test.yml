@@ -30,3 +30,7 @@ jobs:
     - name: Test Analyzer
       run: cargo test --verbose
       working-directory: src/analyser
+
+    - name: Test IRGen
+      run: cargo test --verbose
+      working-directory: src/irgen

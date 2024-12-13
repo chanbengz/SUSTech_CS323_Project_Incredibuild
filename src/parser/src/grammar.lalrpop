@@ -734,7 +734,7 @@ StructRef: Vec<tree::Variable> = {
                     error: LexicalError::MissingLexeme(Span {
                         source: source.to_string(),
                         start: l - 1,
-                        end: l
+                        end: r
                     }, "field name".to_string())
                 },
                 dropped_tokens: Vec::new(),
