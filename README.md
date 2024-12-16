@@ -21,17 +21,34 @@ SPL(SUSTech Programming Language) Compiler in Rust
 - [ ] Advanced
     - [ ] Lifetime Analysis
 
+## Getting Started
+
+At first, you need to setup the environment by installing Rust and Cargo, please follow instruction in [development](#development) section.
+
+Then you can build the project by running
+
+```bash
+cargo run /path/to/your/spl/file
+```
+
+> [!INFO]
+> Some of the functionalities are weird in release mode.
+
+See `cargo run` for more options.
+
 ## File structure
 
 ```
 .
-├── Cargo.toml # Add your sub-project in the [workspace] members field.
+├── Cargo.toml # Binding of submodules
 ├── Dockerfile # Build the environment for the project
 ├── docs
 │   ├── cs323-project-tutorial1.pdf
 │   ├── cs323-project-tutorial2.pdf
 │   ├── cs323-project-tutorial3.pdf
+│   ├── cs323-project-tutorial4.pdf
 │   ├── midterm-project-check.pdf
+│   ├── slides # Presentation slides
 │   ├── syntax.txt
 │   └── token.txt
 ├── LICENSE
@@ -47,7 +64,6 @@ SPL(SUSTech Programming Language) Compiler in Rust
 │   │   ├── Cargo.toml
 │   │   └── src
 │   ├── lexer
-│   │   ├── Cargo.lock
 │   │   ├── Cargo.toml
 │   │   └── src
 │   ├── main.rs
@@ -65,14 +81,6 @@ SPL(SUSTech Programming Language) Compiler in Rust
     └── test_0_r00.out # Sample output
 ```
 
-## Testing
-
-You can run according test to separate sub-project by using `cargo test` in the root of each sub-project.
-
-```bash
-cd src/lexer
-cargo test
-```
 
 ## Development
 
@@ -98,13 +106,22 @@ cargo run
 
 ### "Bare Metal" Mac
 
-Make sure you have Rust and Cargo installed. Install LLVM environment by
+If you're using Mac, make sure you have Rust and Cargo installed. Install LLVM environment by
 
 ```bash
 brew install llvm # or use the package manager you prefer
 
 # find where llvm is installed, for example
 export LLVM_SYS_170_PREFIX=/opt/homebrew/Cellar/llvm/19.1.2 # pretend to be LLVM@17 :)
+```
+
+### Testing
+
+You can run according test to separate crates by using `cargo test` in the root of each. For example
+
+```bash
+cd src/lexer
+cargo test
 ```
 
 ## Issue
