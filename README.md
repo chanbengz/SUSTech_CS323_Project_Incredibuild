@@ -23,15 +23,14 @@ SPL(SUSTech Programming Language) Compiler in Rust
 
 ## Getting Started
 
-At first, you need to setup the environment by installing Rust and Cargo, please follow instruction in [development](#development) section.
-
+At first, you need to setup the environment by installing Rust, Cargo and LLVM, please follow instruction in [development](#development) section. 
 Then you can build the project by running
 
 ```bash
 cargo run /path/to/your/spl/file
 ```
 
-> [!INFO]
+> [!NOTE]
 > Some of the functionalities are weird in release mode.
 
 See `cargo run` for more options.
@@ -117,7 +116,7 @@ export LLVM_SYS_170_PREFIX=/opt/homebrew/Cellar/llvm/19.1.2 # pretend to be LLVM
 
 ### Testing
 
-You can run according test to separate crates by using `cargo test` in the root of each. For example
+You can run test in each crate by using `cargo test` in the root folder. For example
 
 ```bash
 cd src/lexer
