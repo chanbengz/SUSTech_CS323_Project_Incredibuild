@@ -237,7 +237,6 @@ mod tests {
             );
         }
         for i in 1..14 {
-            if i == 7 || i == 8 { continue; } // skip "no-if-before-else" and "invalid statement"
             assert_parse_from_file(Parser::ProgramParser,
                 &format!("../../test/phase1/extra/test_1_s{:0>2}.spl", i),
                 &format!("../../test/phase1/extra/test_1_s{:0>2}.out", i)

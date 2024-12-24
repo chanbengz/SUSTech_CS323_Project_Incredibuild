@@ -1,12 +1,14 @@
 use std::ops::Deref;
 use inkwell as llvm;
-use inkwell::types::{BasicMetadataTypeEnum, BasicType};
-use inkwell::values::{BasicValue, BasicValueEnum};
+use inkwell::AddressSpace;
+use inkwell::module::Linkage;
+use inkwell::types::{BasicMetadataTypeEnum, IntType};
+use inkwell::values::{BasicValue, BasicValueEnum, PointerValue};
 use spl_ast::tree;
 
 pub fn emit_llvmir(source: &str, ast: tree::Program) -> String {
     let context = llvm::context::Context::create();
-    let mut emitter = LLZN::new(&context, source);
+    let emitter = LLZN::new(&context, source);
     emitter.emit(ast);
     emitter.module.print_to_string().to_string()
 }
@@ -15,7 +17,6 @@ struct LLZN<'ctx> {
     pub context: &'ctx llvm::context::Context,
     pub builder: llvm::builder::Builder<'ctx>,
     pub module: llvm::module::Module<'ctx>,
-
 }
 
 
@@ -31,16 +32,48 @@ impl<'ctx> LLZN<'ctx> {
     pub fn emit(&self, ast: tree::Program) {
         ast.emit(self);
     }
+
+    pub fn emit_printf_call(&self, fmt_str: &str, name: &str) -> IntType {
+        let i32_type = self.context.i32_type();
+        let str_type = self.context.ptr_type(AddressSpace::default());
+        let printf_type = i32_type.fn_type(&[str_type.into()], true);
+
+        let printf = self
+            .module
+            .add_function("printf", printf_type, Some(Linkage::External));
+
+        let pointer_value = self.emit_global_string(fmt_str, name);
+        self.builder.build_call(printf, &[pointer_value.into()], "").expect("Error in emit_printf_call");
+
+        i32_type
+    }
+
+    fn emit_global_string(&self, string: &str, name: &str) -> PointerValue {
+        let ty = self.context.i8_type().array_type(string.len() as u32);
+        let gv = self
+            .module
+            .add_global(ty, Some(AddressSpace::default()), name);
+        gv.set_linkage(Linkage::Internal);
+        gv.set_initializer(&self.context.const_string(string.as_ref(), false));
+
+        let pointer_value = self.builder.build_pointer_cast(
+            gv.as_pointer_value(),
+            self.context.ptr_type(AddressSpace::default()),
+            name,
+        );
+
+        pointer_value.unwrap()
+    }
 }
 
 
 trait Emit<'ctx> {
-    type output;
-    fn emit(&self, emitter: &'ctx LLZN) -> Self::output;
+    type Output;
+    fn emit(&self, emitter: &'ctx LLZN) -> Self::Output;
 }
 
 impl<'ctx> Emit<'ctx> for tree::Program {
-    type output = ();
+    type Output = ();
     fn emit(&self, emitter: &'ctx LLZN) {
         match self {
             tree::Program::Program(parts) => {
@@ -54,7 +87,7 @@ impl<'ctx> Emit<'ctx> for tree::Program {
 }
 
 impl<'ctx> Emit<'ctx> for tree::ProgramPart {
-    type output = ();
+    type Output = ();
     fn emit(&self, emitter: &'ctx LLZN) {
         match self {
             tree::ProgramPart::Statement(stmt) => stmt.emit(emitter),
@@ -64,7 +97,7 @@ impl<'ctx> Emit<'ctx> for tree::ProgramPart {
 }
 
 impl<'ctx> Emit<'ctx> for tree::Statement {
-    type output = ();
+    type Output = ();
     fn emit(&self, emitter: &'ctx LLZN) {
         match self {
             tree::Statement::GlobalVariable(vars, ..) => {
@@ -87,7 +120,7 @@ impl<'ctx> Emit<'ctx> for tree::Statement {
 }
 
 impl<'ctx> Emit<'ctx> for tree::Variable {
-    type output = ();
+    type Output = ();
     fn emit(&self, _emitter: &'ctx LLZN) {
         match self {
             tree::Variable::VarAssignment(var, expr) => {
@@ -114,7 +147,7 @@ impl<'ctx> Emit<'ctx> for tree::Variable {
 }
 
 impl<'ctx> Emit<'ctx> for tree::Function {
-    type output = ();
+    type Output = ();
     fn emit(&self, emitter: &'ctx LLZN) {
         match self {
             tree::Function::FuncDeclaration(name, params, ret_ty, body) => {
@@ -163,7 +196,7 @@ impl<'ctx> Emit<'ctx> for tree::Function {
 }
 
 impl<'ctx> Emit<'ctx> for tree::Body {
-    type output = ();
+    type Output = ();
     fn emit(&self, emitter: &'ctx LLZN) {
         match self {
             tree::Body::Body(stmts) => {
@@ -177,7 +210,7 @@ impl<'ctx> Emit<'ctx> for tree::Body {
 }
 
 impl<'ctx> Emit<'ctx> for tree::Expr {
-    type output = ();
+    type Output = ();
     fn emit(&self, emitter: &'ctx LLZN) {
         match self {
             tree::Expr::Return(expr, ..) => {
@@ -194,7 +227,7 @@ impl<'ctx> Emit<'ctx> for tree::Expr {
 }
 
 impl<'ctx> Emit<'ctx> for tree::CompExpr {
-    type output = BasicValueEnum<'ctx>;
+    type Output = BasicValueEnum<'ctx>;
 
     fn emit(&self, emitter: &'ctx LLZN) -> BasicValueEnum<'ctx> {
         match self {

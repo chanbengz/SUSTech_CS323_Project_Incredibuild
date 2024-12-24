@@ -57,6 +57,8 @@ ArgList: Vec<Box<tree::CompExpr>> = {
         v.push(e);
         v
     },
+
+    // Error handling
     ArgList "," <l:@L> <missing:!> <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
@@ -74,6 +76,13 @@ ArgList: Vec<Box<tree::CompExpr>> = {
 }
 
 VarDecs: Vec<tree::Variable> = {
+    <l:@L> <mut v:VarDecs> "," <e:VarDec> <r:@R> => {
+        v.push(e);
+        v
+    },
+    <e:VarDec> => vec![e],
+
+    // Error handling
     VarDecs "," <l:@L> ! <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
@@ -87,15 +96,10 @@ VarDecs: Vec<tree::Variable> = {
         errors.push(error);
         Vec::new()
     },
-    <l:@L> <mut v:VarDecs> "," <e:VarDec> <r:@R> => {
-        v.push(e);
-        v
-    },
-    <e:VarDec> => vec![e],
 }
 
 ParaDec: tree::Variable = {
-    <l:@L> <missing:!> <name:Identifier?> <r:@R> => {
+    <l:@L> <missing:!> Identifier? <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
                 error: LexicalError::MissingLexeme(Span {
@@ -135,6 +139,19 @@ ParaDec: tree::Variable = {
 }
 
 DimDecs: Vec<tree::CompExpr> = {
+    "[" <n:CompExpr> "]" => {
+        let mut v = Vec::new();
+        v.push(*n);
+        v
+    },
+    "[" <n:CompExpr> "]" <size:DimDecs> => {
+        let mut v = Vec::new();
+        v.push(*n);
+        v.extend(size);
+        v
+    },
+
+    // Error handling
     "[" CompExpr <l:@L> <missing:!> <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
@@ -149,17 +166,6 @@ DimDecs: Vec<tree::CompExpr> = {
         errors.push(error);
         Vec::new()
     },
-    "[" <n:CompExpr> "]" => {
-        let mut v = Vec::new();
-        v.push(*n);
-        v
-    },
-    "[" <n:CompExpr> "]" <size:DimDecs> => {
-        let mut v = Vec::new();
-        v.push(*n);
-        v.extend(size);
-        v
-    }
 }
 
 /*
@@ -292,7 +298,6 @@ FieldsDec: Vec<tree::Variable> = {
 */
 pub FuncDec: Box<tree::Function> = {
     <ret: Specifier> <name:Identifier> <lb:"("> <params:ParaDecs> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> "}" => {
-
         if rb == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
@@ -302,16 +307,18 @@ pub FuncDec: Box<tree::Function> = {
                         end: r + 1
                     }, "closing parenthesis ')'".to_string())
                 },
-                dropped_tokens: Vec::new(), // or specify the dropped tokens
+                dropped_tokens: Vec::new(),
             };
             errors.push(error);
+            Box::new(tree::Function::Error)
+        } else {
+            Box::new(tree::Function::FuncDeclaration(
+                Box::new(name),
+                params,
+                Box::new(ret),
+                body
+            ))
         }
-        Box::new(tree::Function::FuncDeclaration(
-            Box::new(name),
-            params,
-            Box::new(ret),
-            body
-        ))
     },
     <ret: Specifier> <name:Identifier> <lb:"("> <params:ParaDecs> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> ! <vr:@R> => {
         let error = ErrorRecovery {
@@ -322,11 +329,25 @@ pub FuncDec: Box<tree::Function> = {
                     end: vr + 1
                 }, "closing brace '}'".to_string())
             },
-            dropped_tokens: Vec::new(), // or specify the dropped tokens
+            dropped_tokens: Vec::new(),
         };
         errors.push(error);
         Box::new(tree::Function::Error)
-    }
+    },
+    <ret: Specifier> <name:Identifier> <lb:"("> <params:ParaDecs> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> <vl:@L> ! <vr:@R> "{" Expr+ "}" "}" => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::StatementError(Span {
+                    source: source.to_string(),
+                    start: vl,
+                    end: vr + 1
+                }, "No 'if' before 'else'".to_string())
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        Box::new(tree::Function::Error)
+    },
 }
 
 FuncCall: tree::Expr = {
@@ -957,6 +978,20 @@ VarDec: tree::Variable = {
     },
 
     // Error handling
+    <l:@L> "=" <r:@R> CompExpr => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(Span {
+                    source: source.to_string(),
+                    start: l,
+                    end: l + 1
+                }, "left value".to_string())
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        tree::Variable::Error
+    },
     <ident: Identifier> <size: DimDecs?> "=" <l:@L> <missing:!> <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
@@ -1040,7 +1075,7 @@ pub CompExpr: Box<tree::CompExpr> = {
     Term,
 
     #[precedence(level="2")] #[assoc(side="left")]
-    <lhs: CompExpr> <l:@L> <error: "error"> <r:@R> <rhs:CompExpr> => {
+    CompExpr <l:@L> <error: "error"> <r:@R> CompExpr => {
         let error = ErrorRecovery {
             error: ParseError::User {
                 error: LexicalError::UnknownLexeme(Span {
@@ -1055,7 +1090,7 @@ pub CompExpr: Box<tree::CompExpr> = {
         Box::new(tree::CompExpr::Error)
     },
 
-    <lhs:CompExpr> "^" <l:@L> <rhs:!> <r:@R> => {
+    CompExpr "^" <l:@L> ! <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
                 error: LexicalError::MissingLexeme(Span {
@@ -1075,7 +1110,7 @@ pub CompExpr: Box<tree::CompExpr> = {
         ))
     },
 
-    <lhs:CompExpr> "%" <l:@L> <rhs:!> <r:@R> => {
+    CompExpr "%" <l:@L> ! <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
                 error: LexicalError::MissingLexeme(Span {
@@ -1288,7 +1323,6 @@ extern {
 
     enum Token {
         "identifier" => Token::Identifier(<String>),
-    
         "int" => Token::LiteralInt(<u32>),
         "float" => Token::LiteralFloat(<f32>),
         "bool" => Token::LiteralBool(<bool>),
@@ -1300,7 +1334,6 @@ extern {
         "typestr" => Token::TypeString,
         "void" => Token::TypeVoid,
         "null" => Token::TypeNull,
-
         "(" => Token::LeftParen,
         ")" => Token::RightParen,
         "{" => Token::LeftBrace,
@@ -1311,7 +1344,6 @@ extern {
         "," => Token::Comma,
         ";" => Token::Semicolon,
         ":" => Token::Colon,
-
         "+" => Token::OpPlus,
         "-" => Token::OpMinus,
         "*" => Token::OpMul,
@@ -1330,7 +1362,6 @@ extern {
         "=" => Token::OpAssign,
         "++" => Token::OpIncrement,
         "--" => Token::OpDecrement,
-
         "if" => Token::KeywordIf,
         "else" => Token::KeywordElse,
         "while" => Token::KeywordWhile,
@@ -1338,11 +1369,9 @@ extern {
         "return" => Token::KeywordReturn,
         "break" => Token::KeywordBreak,
         "continue" => Token::KeywordContinue,
-
         "enum" => Token::DeclarationEnum,
         "struct" => Token::DeclarationStruct,
         "include" => Token::DeclarationInclude,
-
         "invalid" => Token::Invalid,
         "error" => Token::Error,
     }
