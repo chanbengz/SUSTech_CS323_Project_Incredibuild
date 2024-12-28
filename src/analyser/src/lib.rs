@@ -45,7 +45,7 @@ mod tests {
 
     #[test]
     fn test_self_defined(){
-        for i in 1..4 {
+        for i in 1..5 {
             let in_path = format!("../../test/phase2/self_def_s{:0>2}.spl", i);
             let out_path = format!("../../test/phase2/self_def_s{:0>2}.out", i);
             assert_analyze_from_file(&in_path, &out_path);

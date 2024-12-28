@@ -45,5 +45,6 @@ pub enum BasicType {
 	Bool,
 	String,
 	Struct(String),
+	Pointer(Box<BasicType>),
 	Null
 }

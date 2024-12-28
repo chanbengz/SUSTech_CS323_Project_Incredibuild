@@ -1,0 +1,11 @@
+int main() {
+    int x = 42;       // Declare an integer variable
+    int *ptr = &x;    
+
+    float y = 30.0;
+    float *ptr_f = &x;
+    float *ptr_t = &y;
+
+    char z = 'a';
+    char *ptr_z = z;
+}
