@@ -221,6 +221,8 @@ mod tests {
         "Struct: Struct Definition: obj with [Variable Declaration: a = [0: u32] with dimensions [], Variable Declaration: b = [ : char] with dimensions []]");
         assert_parse(Parser::StmtParser, "#include \"../hi.h\"", "Include: ../hi.h");
         assert_parse(Parser::StmtParser, "int a[1];", "GlobalVariable: [Variable Declaration: a = [0: u32] with dimensions [1: u32]]");
+        assert_parse(Parser::ProgramParser, "int main(){ int a; int *b = &a; int c = *b;}", 
+        "Functions: Function: main:[Body: [Variable Declaration: a = [0: u32] with dimensions [], Variable Declaration: b = [Pointer(0: u32)] with dimensions []; Variable Assignment: b = (& a), Variable Declaration: c = [0: u32] with dimensions []; Variable Assignment: c = (* b)]]");
     }
 
     #[test]

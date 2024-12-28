@@ -1,2 +1,1 @@
-Error type A at Line 7: Unknown lexeme |
-Error type A at Line 8: Unknown lexeme &
+Functions: Function: test_1_r07:[Body: [Variable Declaration: a = [0: u32] with dimensions []; Variable Declaration: b = [0: u32] with dimensions []; Variable Declaration: c = [0: u32] with dimensions [], Variable Assignment: a = 1: u32, Variable Assignment: b = (a + 2: u32), Variable Assignment: c = (b - 3: u32), Variable Assignment: a = (c | 4: u32), Variable Assignment: b = (a & 5: u32)]]

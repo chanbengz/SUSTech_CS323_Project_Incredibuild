@@ -197,7 +197,7 @@ mod test {
     fn operators() {
         assert_lex(
             "
-                ++ -- ! * / % ^ + - < <= > >= == != && || =
+                ++ -- ! * / % ^ + - < <= > >= == != && || = & |
             ",
              &[
                 (OpIncrement, "++"),
@@ -217,7 +217,9 @@ mod test {
                 (OpNotEqual, "!="),
                 (OpAnd, "&&"),
                 (OpOr, "||"),
-                (OpAssign, "=")
+                (OpAssign, "="),
+                (OpBitwiseAnd, "&"),
+                (OpBitwiseOr, "|"),
             ][..]
         );
     }
