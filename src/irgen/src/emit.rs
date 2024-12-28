@@ -5,22 +5,21 @@ use inkwell as llvm;
 use inkwell::AddressSpace;
 use inkwell::module::Linkage;
 use inkwell::targets::*;
-use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, IntType};
+use inkwell::types::{BasicType, BasicTypeEnum, IntType};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, IntValue, PointerValue};
 use spl_ast::tree;
-
 
 pub fn emit_llvmir(source: &str, ast: tree::Program) -> String {
     let context = llvm::context::Context::create();
     let mut emitter = Azuki::new(&context, source);
-    emitter.emit(&ast);
+    ast.emit(&mut emitter);
     emitter.module.print_to_string().to_string()
 }
 
 pub fn emit_object(source: &str, ast: tree::Program, path: &str) {
     let context = llvm::context::Context::create();
     let mut emitter = Azuki::new(&context, source);
-    emitter.emit(&ast);
+    ast.emit(&mut emitter);
     emitter.gen_code(Path::new(path));
 }
 
@@ -30,32 +29,31 @@ struct Azuki<'ast, 'ctx> {
     pub module: llvm::module::Module<'ctx>,
 
     pub scope: Vec<HashMap<&'ast str, (PointerValue<'ctx>, BasicTypeEnum<'ctx>)>>,
-    printf: llvm::values::FunctionValue<'ctx>,
+    printf: Option<llvm::values::FunctionValue<'ctx>>,
 }
 
 impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
     pub fn new(context: &'ctx llvm::context::Context, source: &str) -> Self {
         let module = context.create_module(source);
-        let i32type = context.i32_type();
-        let strtype = context.ptr_type(AddressSpace::default()).into();
-        let printf = module.add_function("printf", i32type.fn_type(&[strtype], true), Some(Linkage::External));
 
         Self {
             context,
             builder: context.create_builder(),
             module,
             scope: vec![HashMap::new()],
-            printf,
+            printf: None,
         }
     }
 
-    fn emit(&mut self, ast: &'ast tree::Program) {
-        ast.emit(self);
-    }
-
     fn emit_printf_call(&mut self, args: &[BasicMetadataValueEnum]) -> IntType {
+        if self.printf.is_none() {
+            let i32type = self.context.i32_type();
+            let strtype = self.context.ptr_type(AddressSpace::default()).into();
+            self.printf = Some(self.module.add_function("printf", i32type.fn_type(&[strtype], true), Some(Linkage::External)));
+        }
+
         let i32_type = self.context.i32_type();
-        self.builder.build_call(self.printf, args, "").expect("Error in emit_printf_call");
+        self.builder.build_call(self.printf.unwrap(), args, "").expect("Error in emit_printf_call");
         i32_type
     }
 
@@ -94,18 +92,29 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
 
         target_machine.write_to_file(&self.module, FileType::Object, path).unwrap();
     }
+
+    fn get_var(&self, name: &str) -> Option<(&PointerValue<'ctx>, &BasicTypeEnum<'ctx>)> {
+        for scope in self.scope.iter().rev() {
+            if let Some((ptr, ty)) = scope.get(name) {
+                return Some((ptr, ty));
+            }
+        }
+        None
+    }
 }
 
 
 // Emit LLVM IR from AST
 trait Emit<'ast, 'ctx> {
     type Output;
-    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output;
+    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output where 'ast:'ctx;
 }
 
 impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Program {
     type Output = ();
-    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) {
+    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
+        where 'ast:'ctx
+    {
         match self {
             tree::Program::Program(parts) => {
                 for part in parts {
@@ -119,7 +128,9 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Program {
 
 impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::ProgramPart {
     type Output = ();
-    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) {
+    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
+        where 'ast:'ctx
+    {
         match self {
             tree::ProgramPart::Statement(stmt) => stmt.emit(emitter),
             tree::ProgramPart::Function(func) => { func.emit(emitter); },
@@ -129,20 +140,22 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::ProgramPart {
 
 impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
     type Output = ();
-    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) {
+    fn emit(&'ast self, _emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
+        where 'ast:'ctx
+    {
         match self {
             tree::Statement::GlobalVariable(vars, ..) => {
                 for var in vars {
                     match var {
-                        tree::Variable::VarAssignment(var, expr) => {
-
-                        },
-                        tree::Variable::VarReference(name, dims) => {
-
-                        },
-                        tree::Variable::VarDeclaration(name, ty, dims) => {
-
-                        },
+                        // tree::Variable::VarAssignment(var, expr) => {
+                        //
+                        // },
+                        // tree::Variable::VarReference(name, dims) => {
+                        //
+                        // },
+                        // tree::Variable::VarDeclaration(name, ty, dims) => {
+                        //
+                        // },
                         // tree::Variable::StructDefinition(_, _) => {}
                         // tree::Variable::StructDeclaration(_, _, _) => {}
                         // tree::Variable::StructReference(_) => {}
@@ -150,52 +163,55 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
                     }
                 }
             }
-            tree::Statement::Struct(def, _) => {
-
-            },
+            // tree::Statement::Struct(def, _) => {
+            //
+            // },
             _ => panic!("Error in Statement"),
         }
     }
 }
 
 impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
-    type Output = Option<BasicMetadataValueEnum<'ctx>>;
-    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Option<BasicMetadataValueEnum<'ctx>> {
+    type Output = Option<BasicValueEnum<'ctx>>;
+    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
+        where 'ast:'ctx
+    {
         match self {
             tree::Variable::VarAssignment(var, expr) => {
-                let var = var.emit(emitter).unwrap();
-                let expr = expr.emit(emitter);
-                emitter.builder.build_store(var.into_pointer_value(), expr.into_int_value())
-                    .expect("Error in variable assignment");
+                let val = expr.deref().emit(emitter).into_int_value();
+                match var.deref() {
+                    tree::Variable::VarReference(name, _dims) => {
+                        let ptr = *(emitter.get_var(name.deref()).unwrap().0);
+                        emitter.builder.build_store(ptr, val).expect("");
+                    },
+                    _ => panic!("Error in Variable"),
+                };
                 None
             }
             tree::Variable::VarReference(name, dims) => {
-                for scope in emitter.scope.iter().rev() {
-                    if let Some((ptr, ty)) = scope.get(name.deref().as_str()) {
-                        let (ptr, ty) = (*ptr, *ty);
-                        return if dims.is_empty() {
-                            Some(emitter.builder.build_load(ty, ptr, name.deref()).unwrap().as_basic_value_enum().into())
-                        } else {
-                            let mut idx_vals = vec![emitter.context.i32_type().const_zero()];
-                            idx_vals.extend(dims.deref().iter().map(|dim| dim.emit(emitter).into_int_value()));
+                let (ptr, ty) = emitter.get_var(name.deref()).unwrap();
+                let (ptr, ty) = (*ptr, *ty);
+                if dims.is_empty() {
+                    Some(emitter.builder.build_load(ty, ptr, name.deref()).unwrap().as_basic_value_enum().into())
+                } else {
+                    let mut idx_vals = vec![emitter.context.i32_type().const_zero()];
+                    idx_vals.extend(dims.deref().iter().map(|dim| dim.emit(emitter).into_int_value()));
 
-                            Some(emitter.builder.build_load(
-                                ty,
-                                unsafe {
-                                    emitter.builder.build_in_bounds_gep(ty, ptr, idx_vals.as_ref(), "index").unwrap()
-                                },
-                                name.deref()
-                            ).unwrap().into())
-                        }
-                    }
+                    Some(emitter.builder.build_load(
+                        ty,
+                        unsafe {
+                            emitter.builder.build_in_bounds_gep(ty, ptr, idx_vals.as_ref(), "index").unwrap()
+                        },
+                        name.deref()
+                    ).unwrap().into())
                 }
-                None
             }
             tree::Variable::VarDeclaration(name, ty, dims) => {
                 let ty = if dims.is_empty() {
                     match (*ty).deref() {
                         tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
                         tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
+                        tree::Value::Pointer(_) => emitter.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
                         _ => panic!("Type not supported"),
                     }
                 } else {
@@ -207,8 +223,8 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
                             .as_basic_type_enum()
                     )
                 };
-                let alloca = emitter.builder.build_alloca(ty, name.deref()).unwrap();
-                emitter.scope.last_mut().unwrap().insert(name.deref(), (alloca, ty));
+                let new_var = emitter.builder.build_alloca(ty, name.deref()).unwrap();
+                emitter.scope.last_mut().unwrap().insert(name.deref(), (new_var, ty));
 
                 None
             }
@@ -222,7 +238,9 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
 
 impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Function {
     type Output = Option<BasicValueEnum<'ctx>>;
-    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Option<BasicValueEnum<'ctx>> {
+    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
+        where 'ast:'ctx
+    {
         match self {
             tree::Function::FuncDeclaration(name, params, ret_ty, body) => {
                 emitter.scope.push(HashMap::new());
@@ -231,8 +249,8 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Function {
                 for param in params {
                     if let tree::Variable::FormalParameter(_, ty, _) = param {
                         match *ty.deref() {
-                            tree::Value::Integer(_) => paras_ty.push(BasicMetadataTypeEnum::from(emitter.context.i32_type())),
-                            tree::Value::Float(_) => paras_ty.push(BasicMetadataTypeEnum::from(emitter.context.f32_type())),
+                            tree::Value::Integer(_) => paras_ty.push(emitter.context.i32_type().into()),
+                            tree::Value::Float(_) => paras_ty.push(emitter.context.f32_type().into()),
                             _ => panic!("Error in Function"),
                         }
                     } else {
@@ -289,7 +307,9 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Function {
 
 impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Body {
     type Output = ();
-    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) {
+    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
+        where 'ast:'ctx
+    {
         match self {
             tree::Body::Body(stmts) => {
                 for stmt in stmts {
@@ -303,7 +323,9 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Body {
 
 impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Expr {
     type Output = ();
-    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) {
+    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
+        where 'ast:'ctx
+    {
         match self {
             tree::Expr::Return(expr, ..) => {
                 if expr.eq(&tree::CompExpr::Value(tree::Value::Null)) {
@@ -316,6 +338,9 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Expr {
             tree::Expr::FuncCall(function, _) => {
                 function.emit(emitter);
             },
+            tree::Expr::VarManagement(vars, _) => {
+                let _ = vars.iter().map(|var| var.emit(emitter)).collect::<Vec<Option<BasicValueEnum>>>();
+            },
             // if, while, for, ...
             _ => unimplemented!(),
         }
@@ -324,7 +349,9 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Expr {
 
 impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
     type Output = BasicValueEnum<'ctx>;
-    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> BasicValueEnum<'ctx> {
+    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
+        where 'ast:'ctx
+    {
         match self {
             tree::CompExpr::Value(n) => match n {
                 tree::Value::Integer(n) => emitter.context.i32_type().const_int(*n as u64, false).as_basic_value_enum(),
@@ -332,7 +359,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
                 tree::Value::String(s) => emitter.emit_global_string(&mut s.to_owned(), "").as_basic_value_enum(),
                 _ => panic!("Error in CompExpr"),
             }
-            // CompExpr::Variable(_) => {}
+            tree::CompExpr::Variable(var) => var.emit(emitter).unwrap(),
             tree::CompExpr::FuncCall(function) => {
                 function.emit(emitter).unwrap_or(
                     emitter.context.i32_type().const_int(0, false).as_basic_value_enum()
@@ -387,7 +414,9 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
 
 impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CondExpr {
     type Output = BasicValueEnum<'ctx>;
-    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> BasicValueEnum<'ctx> {
+    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
+        where 'ast:'ctx
+    {
         match self {
             tree::CondExpr::Bool(b) => emitter.context.bool_type().const_int(*b as u64, false).as_basic_value_enum(),
             tree::CondExpr::UnaryCondition(op, expr) => {
