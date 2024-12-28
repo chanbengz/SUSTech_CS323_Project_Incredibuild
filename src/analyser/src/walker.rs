@@ -567,6 +567,14 @@ impl Walker {
                     println!("Function Call");
                 }
                 self.update_line_with_span(span);
+                match function {
+                    Function::FuncReference(name, _params) => {
+                        if (*name).as_str().eq("printf") {
+                            return;
+                        }
+                    }
+                    _ => {}
+                }
                 self.traverse_function(function);
             }
             Expr::Break(span) => {

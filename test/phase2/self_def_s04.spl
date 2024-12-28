@@ -8,4 +8,6 @@ int main() {
 
     char z = 'a';
     char *ptr_z = z;
+
+    printf("Hello!"); // Test out printf
 }
