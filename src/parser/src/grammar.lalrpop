@@ -1211,12 +1211,55 @@ pub CompExpr: Box<tree::CompExpr> = {
             lhs, tree::BinaryOperator::Sub, rhs
         ))
     },
+
+    #[precedence(level="5")] #[assoc(side="left")]
+    <lhs:CompExpr> "&" <l:@L> <rhs:!> <r:@R> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(Span {
+                    source: source.to_string(),
+                    start: l,
+                    end: l + 1
+                }, "Exp after &".to_string())
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        Box::new(tree::CompExpr::Error)
+    },
+    <l:@L> <lhs:CompExpr> "&" <rhs:CompExpr> <r:@R> => {
+        Box::new(tree::CompExpr::BinaryOperation (
+            lhs, tree::BinaryOperator::BitwiseAnd, rhs
+        ))
+    },
+    <lhs:CompExpr> "|" <l:@L> <rhs:!> <r:@R> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(Span {
+                    source: source.to_string(),
+                    start: l,
+                    end: l + 1
+                }, "Exp after |".to_string())
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        Box::new(tree::CompExpr::Error)
+    },
+    <l:@L> <lhs:CompExpr> "|" <rhs:CompExpr> <r:@R> => {
+        Box::new(tree::CompExpr::BinaryOperation (
+            lhs, tree::BinaryOperator::BitwiseOr, rhs
+        ))
+    },
 }
 
 Specifier: tree::Value = {
     <t:"typeint"> => tree::Value::Integer(0),
+    <t:"typeint"> "*" => tree::Value::Pointer(Box::new(tree::Value::Integer(0))),
     <t:"typefloat"> => tree::Value::Float(0.0),
+    <t:"typefloat"> "*" => tree::Value::Pointer(Box::new(tree::Value::Float(0.0))),
     <t:"typechar"> => tree::Value::Char(' '),
+    <t:"typechar"> "*" => tree::Value::Pointer(Box::new(tree::Value::Char(' '))),
     <t:"typestr"> => tree::Value::String(String::new()),
     <t:"void"> => tree::Value::Null,
     "struct" <str: Identifier> => tree::Value::Struct(str)
@@ -1262,7 +1305,32 @@ Term: Box<tree::CompExpr> = {
     <s:StructRef> => {
         Box::new(tree::CompExpr::Variable(tree::Variable::StructReference(Box::new(s))))
     },
-
+    "&" <ident:Identifier> => {
+        Box::new(tree::CompExpr::UnaryOperation(
+            tree::UnaryOperator::Ref,
+            Box::new(
+                tree::CompExpr::Variable(
+                    tree::Variable::VarReference(
+                        Box::new(ident), 
+                        Box::new(Vec::new())
+                    )
+                )
+            )
+        ))
+    },
+    "*" <ident:Identifier> => {
+        Box::new(tree::CompExpr::UnaryOperation(
+            tree::UnaryOperator::Deref,
+            Box::new(
+                tree::CompExpr::Variable(
+                    tree::Variable::VarReference(
+                        Box::new(ident), 
+                        Box::new(Vec::new())
+                    )
+                ),
+            )
+        ))
+    },
     // error recovery
     <ident: Identifier> "(" ArgList? <l:@L> <missing:!> <r:@R> => {
         let error = ErrorRecovery {
@@ -1362,6 +1430,8 @@ extern {
         "=" => Token::OpAssign,
         "++" => Token::OpIncrement,
         "--" => Token::OpDecrement,
+        "&" => Token::OpBitwiseAnd,
+        "|" => Token::OpBitwiseOr,
         "if" => Token::KeywordIf,
         "else" => Token::KeywordElse,
         "while" => Token::KeywordWhile,

@@ -86,6 +86,7 @@ pub enum Value {
     Char(char),
     Bool(bool),
     Struct(String),
+    Pointer(Box<Value>),
     Null
 }
 
@@ -99,6 +100,8 @@ pub enum BinaryOperator {
     Mod, // %
     And, // && 
     Or,  // ||
+    BitwiseAnd, // &
+    BitwiseOr, // |
     Error
 }
 
@@ -107,7 +110,9 @@ pub enum UnaryOperator {
     Not, // !
     Inc, // ++
     Dec, // --
-    Error
+    Ref, //&
+    Deref, //*
+    Error,
 }
 
 #[derive(Clone, Debug, PartialEq)]

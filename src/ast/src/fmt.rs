@@ -114,6 +114,7 @@ impl fmt::Display for Value {
             Value::Char(c) => write!(f, "{}: char", c),
             Value::Bool(b) => write!(f, "{}: bool", b),
             Value::Struct(s) => write!(f, "Struct({})", s),
+            Value::Pointer(p) => write!(f, "Pointer({})", p),
             Value::Null => write!(f, "null")
         }
     }
@@ -131,6 +132,8 @@ impl fmt::Display for BinaryOperator {
             BinaryOperator::And => write!(f, "&&"),
             BinaryOperator::Or => write!(f, "||"),
             BinaryOperator::Error => write!(f, "[BinaryOperatorError]"),
+            BinaryOperator::BitwiseAnd => write!(f, "&"),
+            BinaryOperator::BitwiseOr => write!(f, "|"),
         }
     }
 }
@@ -143,6 +146,8 @@ impl fmt::Display for UnaryOperator {
             UnaryOperator::Inc => write!(f, "++"),
             UnaryOperator::Dec => write!(f, "--"),
             UnaryOperator::Error => write!(f, "[UnaryOperatorError]"),
+            UnaryOperator::Ref => write!(f, "&"),
+            UnaryOperator::Deref => write!(f, "*"),
         }
     }
 }

@@ -90,9 +90,9 @@ pub enum Token {
     OpMod,
     #[token("^")]
     OpPow,
-    #[token("&&")]
+    #[token("&&", priority = 5)]
     OpAnd,
-    #[token("||")]
+    #[token("||", priority = 5)]
     OpOr,
     #[token("!")]
     OpNot,
@@ -100,6 +100,10 @@ pub enum Token {
     OpIncrement,
     #[token("--")]
     OpDecrement,
+    #[token("&", priority = 3)]
+    OpBitwiseAnd,
+    #[token("|", priority = 3)]
+    OpBitwiseOr,
 
     // Punctuation
     #[token(".", priority = 5)]
