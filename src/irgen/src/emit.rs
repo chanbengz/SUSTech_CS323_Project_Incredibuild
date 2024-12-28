@@ -1,9 +1,11 @@
 use std::ops::Deref;
+use std::path::Path;
 use inkwell as llvm;
 use inkwell::AddressSpace;
 use inkwell::module::Linkage;
+use inkwell::targets::*;
 use inkwell::types::{BasicMetadataTypeEnum, IntType};
-use inkwell::values::{BasicValue, BasicValueEnum, PointerValue};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, PointerValue};
 use spl_ast::tree;
 
 pub fn emit_llvmir(source: &str, ast: tree::Program) -> String {
@@ -11,6 +13,13 @@ pub fn emit_llvmir(source: &str, ast: tree::Program) -> String {
     let emitter = LLZN::new(&context, source);
     emitter.emit(ast);
     emitter.module.print_to_string().to_string()
+}
+
+pub fn emit_object(source: &str, ast: tree::Program, path: &str) {
+    let context = llvm::context::Context::create();
+    let emitter = LLZN::new(&context, source);
+    emitter.emit(ast);
+    emitter.gen_code(Path::new(path));
 }
 
 struct LLZN<'ctx> {
@@ -33,7 +42,7 @@ impl<'ctx> LLZN<'ctx> {
         ast.emit(self);
     }
 
-    pub fn emit_printf_call(&self, fmt_str: &str, name: &str) -> IntType {
+    pub fn emit_printf_call(&self, args: &[BasicMetadataValueEnum]) -> IntType {
         let i32_type = self.context.i32_type();
         let str_type = self.context.ptr_type(AddressSpace::default());
         let printf_type = i32_type.fn_type(&[str_type.into()], true);
@@ -42,8 +51,7 @@ impl<'ctx> LLZN<'ctx> {
             .module
             .add_function("printf", printf_type, Some(Linkage::External));
 
-        let pointer_value = self.emit_global_string(fmt_str, name);
-        self.builder.build_call(printf, &[pointer_value.into()], "").expect("Error in emit_printf_call");
+        self.builder.build_call(printf, args, "printf").expect("Error in emit_printf_call");
 
         i32_type
     }
@@ -63,6 +71,24 @@ impl<'ctx> LLZN<'ctx> {
         );
 
         pointer_value.unwrap()
+    }
+
+    fn gen_code(&self, path: &Path) {
+        Target::initialize_aarch64(&InitializationConfig::default());
+        let triple = TargetMachine::get_default_triple();
+        let target  = Target::from_triple(&triple).unwrap();
+        let target_machine = target
+            .create_target_machine(
+                &triple,
+                TargetMachine::get_host_cpu_name().to_str().unwrap_or_default(),
+                TargetMachine::get_host_cpu_features().to_str().unwrap_or_default(),
+                inkwell::OptimizationLevel::Default,
+                RelocMode::Default,
+                CodeModel::Default,
+            )
+            .unwrap();
+
+        target_machine.write_to_file(&self.module, FileType::Object, path).unwrap();
     }
 }
 
@@ -91,7 +117,7 @@ impl<'ctx> Emit<'ctx> for tree::ProgramPart {
     fn emit(&self, emitter: &'ctx LLZN) {
         match self {
             tree::ProgramPart::Statement(stmt) => stmt.emit(emitter),
-            tree::ProgramPart::Function(func) => func.emit(emitter),
+            tree::ProgramPart::Function(func) => { func.emit(emitter); },
         }
     }
 }
@@ -147,8 +173,9 @@ impl<'ctx> Emit<'ctx> for tree::Variable {
 }
 
 impl<'ctx> Emit<'ctx> for tree::Function {
-    type Output = ();
-    fn emit(&self, emitter: &'ctx LLZN) {
+    type Output = Option<BasicValueEnum<'ctx>>;
+
+    fn emit(&self, emitter: &'ctx LLZN) -> Option<BasicValueEnum<'ctx>> {
         match self {
             tree::Function::FuncDeclaration(name, params, ret_ty, body) => {
                 let mut paras_ty = Vec::new();
@@ -163,11 +190,13 @@ impl<'ctx> Emit<'ctx> for tree::Function {
                         panic!("Error in Function");
                     }
                 }
-                let retty = match *ret_ty.deref() {
+
+                let ret_ty = match *ret_ty.deref() {
                     tree::Value::Integer(_) => emitter.context.i32_type().fn_type(paras_ty.as_ref(), false),
+                    tree::Value::Null => emitter.context.void_type().fn_type(paras_ty.as_ref(), false),
                     _ => panic!("Error in Function"),
                 };
-                let func = emitter.module.add_function(name, retty, None);
+                let func = emitter.module.add_function(name, ret_ty, None);
                 let entry = emitter.context.append_basic_block(func, "entry");
                 emitter.builder.position_at_end(entry);
 
@@ -186,11 +215,24 @@ impl<'ctx> Emit<'ctx> for tree::Function {
 
                     emitter.builder.build_store(ptr.unwrap(), value).expect("Error in Function");
                 }
-
                 body.emit(emitter);
-
+                None
             },
-            _ => panic!("Error in Function"), // FuncCall
+            tree::Function::FuncReference(name, params) => {
+                if (*name).as_str().eq("printf") {
+                    let args = params.iter().map(|param| param.emit(emitter).into()).collect::<Vec<BasicMetadataValueEnum>>();
+                    emitter.emit_printf_call(args.as_slice());
+                    return None;
+                }
+
+                let func = emitter.module.get_function((*name).as_str()).expect("Function undeclared");
+                let llvm_args = params.iter().map(|param| param.emit(emitter).into()).collect::<Vec<BasicMetadataValueEnum>>();
+                Some(emitter.builder.build_call(func, llvm_args.as_slice(), (*name).as_str()).unwrap()
+                    .try_as_basic_value()
+                    .left()
+                    .unwrap_or(emitter.context.i32_type().const_int(0, false).as_basic_value_enum()))
+            },
+            tree::Function::Error => panic!("Error in Function")
         }
     }
 }
@@ -220,7 +262,11 @@ impl<'ctx> Emit<'ctx> for tree::Expr {
                     let ret = expr.emit(emitter);
                     emitter.builder.build_return(Some(&ret)).expect("Error in Expr");
                 }
-            }
+            },
+            tree::Expr::FuncCall(function, _) => {
+                function.emit(emitter);
+            },
+            // if, while, for, ...
             _ => unimplemented!(),
         }
     }
@@ -234,10 +280,15 @@ impl<'ctx> Emit<'ctx> for tree::CompExpr {
             tree::CompExpr::Value(n) => match n {
                 tree::Value::Integer(n) => emitter.context.i32_type().const_int(*n as u64, false).as_basic_value_enum(),
                 tree::Value::Float(n) => emitter.context.f32_type().const_float(*n as f64).as_basic_value_enum(),
-                _ => panic!("Error in CompExpr"), // TODO: implement other types
+                tree::Value::String(s) => emitter.emit_global_string(s, "tmp").as_basic_value_enum(),
+                _ => panic!("Error in CompExpr"),
             }
             // CompExpr::Variable(_) => {}
-            // CompExpr::FuncCall(_) => {}
+            tree::CompExpr::FuncCall(function) => {
+                function.emit(emitter).unwrap_or(
+                    emitter.context.i32_type().const_int(0, false).as_basic_value_enum()
+                )
+            },
             tree::CompExpr::BinaryOperation(lhs, op, rhs) => {
                 let lhs = (*lhs.deref()).emit(emitter);
                 let rhs = (*rhs.deref()).emit(emitter);
@@ -248,7 +299,7 @@ impl<'ctx> Emit<'ctx> for tree::CompExpr {
                                 emitter.builder.build_int_add(lhs, rhs.into_int_value(), "addtmp").unwrap().as_basic_value_enum(),
                             BasicValueEnum::FloatValue(lhs) =>
                                 emitter.builder.build_float_add(lhs, rhs.into_float_value(), "addtmp").unwrap().as_basic_value_enum(),
-                            _ => panic!("Error in CompExpr"), // TODO: implement other types
+                            _ => panic!("Error in CompExpr"),
                         }
                     }
                     tree::BinaryOperator::Sub => {
@@ -257,7 +308,7 @@ impl<'ctx> Emit<'ctx> for tree::CompExpr {
                                 emitter.builder.build_int_sub(lhs, rhs.into_int_value(), "subtmp").unwrap().as_basic_value_enum(),
                             BasicValueEnum::FloatValue(lhs) =>
                                 emitter.builder.build_float_sub(lhs, rhs.into_float_value(), "subtmp").unwrap().as_basic_value_enum(),
-                            _ => panic!("Error in CompExpr"), // TODO: implement other types
+                            _ => panic!("Error in CompExpr"),
                         }
                     }
                     tree::BinaryOperator::Mul => {
@@ -266,7 +317,7 @@ impl<'ctx> Emit<'ctx> for tree::CompExpr {
                                 emitter.builder.build_int_mul(lhs, rhs.into_int_value(), "multmp").unwrap().as_basic_value_enum(),
                             BasicValueEnum::FloatValue(lhs) =>
                                 emitter.builder.build_float_mul(lhs, rhs.into_float_value(), "multmp").unwrap().as_basic_value_enum(),
-                            _ => panic!("Error in CompExpr"), // TODO: implement other types
+                            _ => panic!("Error in CompExpr"),
                         }
                     }
                     tree::BinaryOperator::Div => {
@@ -275,12 +326,22 @@ impl<'ctx> Emit<'ctx> for tree::CompExpr {
                                 emitter.builder.build_int_unsigned_div(lhs, rhs.into_int_value(), "divtmp").unwrap().as_basic_value_enum(),
                             BasicValueEnum::FloatValue(lhs) =>
                                 emitter.builder.build_float_div(lhs, rhs.into_float_value(), "divtmp").unwrap().as_basic_value_enum(),
-                            _ => panic!("Error in CompExpr"), // TODO: implement other types
+                            _ => panic!("Error in CompExpr"),
                         }
                     }
                 _ => panic!("Error in CompExpr"),
             }}
             _ => panic!("Error in CompExpr"),
+        }
+    }
+}
+
+impl<'ctx> Emit<'ctx> for tree::CondExpr {
+    type Output = BasicValueEnum<'ctx>;
+
+    fn emit(&self, emitter: &'ctx LLZN) -> BasicValueEnum<'ctx> {
+        match self {
+            _ => unimplemented!()
         }
     }
 }
