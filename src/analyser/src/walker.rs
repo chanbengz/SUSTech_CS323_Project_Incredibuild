@@ -741,16 +741,40 @@ impl Walker {
                 if self.verbose {
                     println!("UnaryOperation: {:?}", op);
                 }
-                let expr_type = self.traverse_comp_expr(expr)?;
-                if let VarType::Primitive(BasicType::Bool) = expr_type {
-                    Some(VarType::Primitive(BasicType::Bool))
-                } else {
-                    self.errors.add_error(SemanticError::TypeError {
-                        id: 20,
-                        message: "Unary '!' operator requires boolean operand".to_owned(),
-                        line: 0,
-                    });
-                    None
+                // From the grammar, unary operators can only operate on variables
+                // and only support two operations: "&" and "*", "&" can only operate
+                // on variables(int, float, char) and "*" can only operate on pointers.
+                let var_type = self.traverse_comp_expr(expr)?;
+                return match op {
+                    UnaryOperator::Ref => {
+                        match var_type {
+                            VarType::Primitive(BasicType::Int) => Some(VarType::Primitive(BasicType::Pointer(Box::new(BasicType::Int)))),
+                            VarType::Primitive(BasicType::Float) => Some(VarType::Primitive(BasicType::Pointer(Box::new(BasicType::Float)))),
+                            VarType::Primitive(BasicType::Char) => Some(VarType::Primitive(BasicType::Pointer(Box::new(BasicType::Char)))),
+                            _ => {
+                                self.errors.add_error(SemanticError::ImproperUsageError {
+                                    id: 11,
+                                    message: "Invalid Reference Operation.".to_owned(),
+                                    line: 0
+                                });
+                                None
+                            }
+                        }
+                    }
+                    UnaryOperator::Deref => {
+                        match var_type {
+                            VarType::Primitive(BasicType::Pointer(t)) => Some(VarType::Primitive(*t)),
+                            _ => {
+                                self.errors.add_error(SemanticError::ImproperUsageError {
+                                    id: 11,
+                                    message: "Invalid Dereference Operation.".to_owned(),
+                                    line: 0
+                                });
+                                None
+                            }
+                        }
+                    }
+                    _ => None
                 }
             }
             CompExpr::BinaryOperation(lhs, op, rhs) => {

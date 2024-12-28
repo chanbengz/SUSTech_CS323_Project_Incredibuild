@@ -10,6 +10,7 @@ impl From<Value> for BasicType {
             Value::Bool(_) => BasicType::Bool,
             Value::String(_) => BasicType::String,
             Value::Struct(obj) => BasicType::Struct(obj),
+            Value::Pointer(e) => BasicType::Pointer(Box::new(BasicType::from(*e))),
             Value::Null => BasicType::Null
         }
     }

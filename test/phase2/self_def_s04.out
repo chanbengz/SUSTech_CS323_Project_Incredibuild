@@ -1,0 +1,2 @@
+[Semantic Error] Invalid Operation Error[5] at line 6: "Assigning a value of type Primitive: type: Pointer(Int) to a variable of type Primitive: type: Pointer(Float)"
+[Semantic Error] Invalid Operation Error[5] at line 10: "Assigning a value of type Primitive: type: Char to a variable of type Primitive: type: Pointer(Char)"
