@@ -16,6 +16,13 @@ pub fn emit_llvmir(source: &str, ast: tree::Program) -> String {
     emitter.module.print_to_string().to_string()
 }
 
+pub fn emit_llvmir_to_file(source: &str, ast: tree::Program, path: &str) {
+    let context = llvm::context::Context::create();
+    let mut emitter = Azuki::new(&context, source);
+    ast.emit(&mut emitter);
+    emitter.module.print_to_file(Path::new(path)).expect("Error in emit_llvmir_to_file");
+}
+
 pub fn emit_object(source: &str, ast: tree::Program, path: &str) {
     let context = llvm::context::Context::create();
     let mut emitter = Azuki::new(&context, source);
@@ -52,9 +59,8 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
             self.printf = Some(self.module.add_function("printf", i32type.fn_type(&[strtype], true), Some(Linkage::External)));
         }
 
-        let i32_type = self.context.i32_type();
         self.builder.build_call(self.printf.unwrap(), args, "").expect("Error in emit_printf_call");
-        i32_type
+        self.context.i32_type()
     }
 
     fn emit_global_string(&mut self, string: &mut String, name: &str) -> PointerValue<'ctx> {
@@ -402,6 +408,15 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
                                 emitter.builder.build_int_unsigned_div(lhs, rhs.into_int_value(), "divtmp").unwrap().as_basic_value_enum(),
                             BasicValueEnum::FloatValue(lhs) =>
                                 emitter.builder.build_float_div(lhs, rhs.into_float_value(), "divtmp").unwrap().as_basic_value_enum(),
+                            _ => panic!("Error in CompExpr"),
+                        }
+                    }
+                    tree::BinaryOperator::Mod => {
+                        match lhs {
+                            BasicValueEnum::IntValue(lhs) =>
+                                emitter.builder.build_int_signed_rem(lhs, rhs.into_int_value(), "modtmp").unwrap().as_basic_value_enum(),
+                            BasicValueEnum::FloatValue(lhs) =>
+                                emitter.builder.build_float_rem(lhs, rhs.into_float_value(), "modtmp").unwrap().as_basic_value_enum(),
                             _ => panic!("Error in CompExpr"),
                         }
                     }

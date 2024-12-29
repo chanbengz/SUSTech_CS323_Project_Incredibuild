@@ -96,12 +96,12 @@ pub enum BinaryOperator {
     Sub, // -
     Mul, // *
     Div, // /
-    Pow, // ^
     Mod, // %
     And, // && 
     Or,  // ||
     BitwiseAnd, // &
     BitwiseOr, // |
+    BitwiseXor, // ^
     Error
 }
 

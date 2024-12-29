@@ -1090,26 +1090,6 @@ pub CompExpr: Box<tree::CompExpr> = {
         Box::new(tree::CompExpr::Error)
     },
 
-    CompExpr "^" <l:@L> ! <r:@R> => {
-        let error = ErrorRecovery {
-            error: ParseError::User {
-                error: LexicalError::MissingLexeme(Span {
-                    source: source.to_string(),
-                    start: l,
-                    end: l + 1
-                }, "Exp after ^".to_string())
-            },
-            dropped_tokens: Vec::new(),
-        };
-        errors.push(error);
-        Box::new(tree::CompExpr::Error)
-    },
-    <l:@L> <lhs:CompExpr> "^" <rhs:CompExpr> <r:@R> => {
-        Box::new(tree::CompExpr::BinaryOperation (
-            lhs, tree::BinaryOperator::Pow, rhs
-        ))
-    },
-
     CompExpr "%" <l:@L> ! <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
@@ -1213,7 +1193,7 @@ pub CompExpr: Box<tree::CompExpr> = {
     },
 
     #[precedence(level="5")] #[assoc(side="left")]
-    <lhs:CompExpr> "&" <l:@L> <rhs:!> <r:@R> => {
+    CompExpr "&" <l:@L> <rhs:!> <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
                 error: LexicalError::MissingLexeme(Span {
@@ -1232,7 +1212,8 @@ pub CompExpr: Box<tree::CompExpr> = {
             lhs, tree::BinaryOperator::BitwiseAnd, rhs
         ))
     },
-    <lhs:CompExpr> "|" <l:@L> <rhs:!> <r:@R> => {
+
+    CompExpr "|" <l:@L> <rhs:!> <r:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
                 error: LexicalError::MissingLexeme(Span {
@@ -1249,6 +1230,26 @@ pub CompExpr: Box<tree::CompExpr> = {
     <l:@L> <lhs:CompExpr> "|" <rhs:CompExpr> <r:@R> => {
         Box::new(tree::CompExpr::BinaryOperation (
             lhs, tree::BinaryOperator::BitwiseOr, rhs
+        ))
+    },
+
+    CompExpr "^" <l:@L> ! <r:@R> => {
+        let error = ErrorRecovery {
+            error: ParseError::User {
+                error: LexicalError::MissingLexeme(Span {
+                    source: source.to_string(),
+                    start: l,
+                    end: l + 1
+                }, "Exp after ^".to_string())
+            },
+            dropped_tokens: Vec::new(),
+        };
+        errors.push(error);
+        Box::new(tree::CompExpr::Error)
+    },
+    <l:@L> <lhs:CompExpr> "^" <rhs:CompExpr> <r:@R> => {
+        Box::new(tree::CompExpr::BinaryOperation (
+            lhs, tree::BinaryOperator::BitwiseXor, rhs
         ))
     },
 }
@@ -1416,7 +1417,7 @@ extern {
         "-" => Token::OpMinus,
         "*" => Token::OpMul,
         "/" => Token::OpDiv,
-        "^" => Token::OpPow,
+        "^" => Token::OpXor,
         "%" => Token::OpMod,
         ">" => Token::OpGreaterThan,
         "<" => Token::OpLessThan,

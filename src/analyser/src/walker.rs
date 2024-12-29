@@ -1,7 +1,6 @@
 use spl_ast::tree::*;
 use std::fs::File;
 use std::io::Read;
-use spl_parser::parse;
 use crate::manager::SymbolManager;
 use crate::error::{SemanticError, SemanticErrorManager};
 use crate::symbol::*;
@@ -20,12 +19,10 @@ pub struct Walker {
 }
 
 impl Walker {
-    pub fn new(program_source: &str, verbose: bool) -> Walker {
+    pub fn new(ast: Program, program_source: &str, verbose: bool) -> Walker {
         let mut src_content = String::new();
         let mut src_file = File::open(program_source).expect("Unable to open file");
         src_file.read_to_string(&mut src_content).expect("Unable to read file");
-
-        let ast = parse(&src_content).unwrap();
 
         Walker {
             program: ast,
@@ -44,6 +41,16 @@ impl Walker {
 
     pub fn get_errors(&self) -> &Vec<SemanticError> {
         self.errors.get_errors()
+    }
+
+    pub fn print_errors(&self) -> Result<(), String> {
+        for error in self.errors.get_errors() {
+            println!("{}", error.to_string());
+        }
+        if self.errors.get_errors().len() > 0 {
+            return Err(format!("{} semantic error(s) found.", self.errors.get_errors().len()));
+        }
+        Ok(())
     }
 
     pub fn update_line(&mut self) {
