@@ -1,9 +1,46 @@
-pub mod emit;
-mod checker;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::Path;
+use spl_ast::tree;
+use crate::azuki::Azuki;
+use crate::emit::Emit;
+use inkwell as llvm;
+
+mod emit;
+mod azuki;
+
+pub fn emit_llvmir(source: &str, ast: tree::Program) -> String {
+    let context = llvm::context::Context::create();
+    let mut emitter = Azuki::new(&context, source);
+    ast.emit(&mut emitter);
+    emitter.module.print_to_string().to_string()
+}
+
+pub fn emit_object(source: &str, ast: tree::Program) -> String {
+    let context = llvm::context::Context::create();
+    let mut emitter = Azuki::new(&context, source);
+    ast.emit(&mut emitter);
+    let mut s = String::new();
+    emitter.gen_code().as_slice().read_to_string(&mut s).expect("");
+    s
+}
+
+pub fn emit_llvmir_to_file(source: &str, ast: tree::Program, path: &str) {
+    let context = llvm::context::Context::create();
+    let mut emitter = Azuki::new(&context, source);
+    ast.emit(&mut emitter);
+    emitter.module.print_to_file(Path::new(path)).expect("Error in emit_llvmir_to_file");
+}
+
+pub fn emit_object_to_file(source: &str, ast: tree::Program, path: &str) {
+    let s = emit_object(source, ast);
+    let mut file = File::create(path).expect("Error in emit_object_to_file");
+    file.write_all(s.as_bytes()).expect("Error in emit_object_to_file");
+}
 
 #[cfg(test)]
 mod tests {
-    use crate::emit::{emit_llvmir};
+    use crate::emit_llvmir;
 
     #[test]
     fn gen_test_r00() {

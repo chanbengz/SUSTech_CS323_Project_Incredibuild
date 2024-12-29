@@ -2,7 +2,7 @@ use spl_parser::{parse_from_file};
 use spl_analyser::walker::Walker;
 use clap::{Arg, Command, ArgAction};
 use colored::Colorize;
-use spl_irgen::emit::*;
+use spl_irgen::{emit_llvmir_to_file, emit_object_to_file};
 
 fn main() -> Result<(), String> {
     let args = Command::new("Incredibuild")
