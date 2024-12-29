@@ -38,7 +38,7 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
             self.printf = Some(self.module.add_function("printf", i32type.fn_type(&[strtype], true), Some(Linkage::External)));
         }
 
-        self.builder.build_call(self.printf.unwrap(), args, "printf_tmp").expect("Error in emit_printf_call");
+        self.builder.build_call(self.printf.unwrap(), args, "").expect("Error in emit_printf_call");
         self.context.i32_type()
     }
 
@@ -49,7 +49,7 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
             self.scanf = Some(self.module.add_function("scanf", i32type.fn_type(&[strtype], true), Some(Linkage::External)));
         }
 
-        self.builder.build_call(self.scanf.unwrap(), args, "scanf_tmp").expect("Error in emit_scanf_call");
+        self.builder.build_call(self.scanf.unwrap(), args, "").expect("Error in emit_scanf_call");
         self.context.i32_type()
     }
 

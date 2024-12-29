@@ -64,9 +64,9 @@ mod tests {
 
     #[test]
     fn test_funccall() {
-        let source = "int foo() { return 114+514; } int main() { printf(\"%d\\n\", foo()); return 0; } ";
+        let source = "int foo(int a) { return a+114000; } int main() { printf(\"%d\\n\", foo(514)); return 0; } ";
         let ast = spl_parser::parse(source).unwrap();
         let ir = emit_llvmir("test_funccall.spl", ast);
-        assert_eq!(ir, "; ModuleID = 'test_funccall.spl'\nsource_filename = \"test_funccall.spl\"\n\n@0 = internal global [4 x i8] c\"%d\\0A\\00\"\n\ndefine i32 @foo() {\nentry:\n  ret i32 628\n}\n\ndefine i32 @main() {\nentry:\n  %foo = call i32 @foo()\n  %printf_tmp = call i32 (ptr, ...) @printf(ptr @0, i32 %foo)\n  ret i32 0\n}\n\ndeclare i32 @printf(ptr, ...)\n");
+        assert_eq!(ir, "; ModuleID = 'test_funccall.spl'\nsource_filename = \"test_funccall.spl\"\n\n@0 = internal global [4 x i8] c\"%d\\0A\\00\"\n\ndefine i32 @foo(i32 %a) {\nentry:\n  %a1 = alloca i32, align 4\n  store i32 %a, ptr %a1, align 4\n  %a2 = load i32, ptr %a1, align 4\n  %addtmp = add i32 %a2, 114000\n  ret i32 %addtmp\n}\n\ndefine i32 @main() {\nentry:\n  %foo = call i32 @foo(i32 514)\n  %0 = call i32 (ptr, ...) @printf(ptr @0, i32 %foo)\n  ret i32 0\n}\n\ndeclare i32 @printf(ptr, ...)\n");
     }
 }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 use inkwell::AddressSpace;
-use inkwell::types::{BasicType};
+use inkwell::types::{BasicMetadataTypeEnum, BasicType};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, IntValue};
 use spl_ast::tree;
 use crate::azuki::Azuki;
@@ -129,6 +129,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
 
                 None
             }
+            tree::Variable::FormalParameter(_, ty, _) => ty.deref().emit(emitter),
             // tree::Variable::StructDefinition(name, vars) => {}
             // tree::Variable::StructDeclaration(structname, inst, members) => {}
             // tree::Variable::StructReference(vars) => {}
@@ -146,21 +147,15 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Function {
             tree::Function::FuncDeclaration(name, params, ret_ty, body) => {
                 emitter.scope.push(HashMap::new());
 
-                let mut paras_ty = Vec::new();
-                for param in params {
-                    if let tree::Variable::FormalParameter(_, ty, _) = param {
-                        match *ty.deref() {
-                            tree::Value::Integer(_) => paras_ty.push(emitter.context.i32_type().into()),
-                            tree::Value::Float(_) => paras_ty.push(emitter.context.f32_type().into()),
-                            _ => panic!("Error in Function"),
-                        }
-                    } else {
-                        panic!("Error in Function");
-                    }
-                }
+                let paras_ty = params.iter().map(|param|
+                    param.emit(emitter).unwrap().get_type().into()
+                ).collect::<Vec<BasicMetadataTypeEnum>>();
 
                 let ret_ty = match *ret_ty.deref() {
                     tree::Value::Integer(_) => emitter.context.i32_type().fn_type(paras_ty.as_ref(), false),
+                    tree::Value::Float(_) => emitter.context.f32_type().fn_type(paras_ty.as_ref(), false),
+                    tree::Value::Char(_) => emitter.context.i8_type().fn_type(paras_ty.as_ref(), false),
+                    tree::Value::Pointer(_) => emitter.context.ptr_type(AddressSpace::default()).fn_type(paras_ty.as_ref(), false),
                     tree::Value::Null => emitter.context.void_type().fn_type(paras_ty.as_ref(), false),
                     _ => panic!("Error in Function"),
                 };
@@ -169,20 +164,18 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Function {
                 emitter.builder.position_at_end(entry);
 
                 for (i, param) in params.iter().enumerate() {
-                    let (ptr, value) = if let tree::Variable::FormalParameter(name, ty, _) = param {
-                        let value = func.get_nth_param(i as u32).unwrap();
-                        value.set_name(name);
-                        match *ty.deref() {
-                            tree::Value::Integer(_) => (emitter.builder.build_alloca(emitter.context.i32_type(), name), value),
-                            tree::Value::Float(_) => (emitter.builder.build_alloca(emitter.context.f32_type(), name), value),
-                            _ => panic!("Error in Function"),
-                        }
+                     if let tree::Variable::FormalParameter(name, _, _) = param {
+                         let value = func.get_nth_param(i as u32).unwrap();
+                         value.set_name(name);
+
+                         let ptr = emitter.builder.build_alloca(value.get_type(), name).unwrap();
+                         emitter.builder.build_store(ptr, value).expect("");
+                         emitter.scope.last_mut().unwrap().insert(name, (ptr, value.get_type().into()));
                     } else {
                         panic!("Error in Function");
                     };
-
-                    emitter.builder.build_store(ptr.unwrap(), value).expect("Error in Function");
                 }
+
                 body.emit(emitter);
                 emitter.scope.pop();
                 None
@@ -257,13 +250,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
         where 'ast:'ctx
     {
         match self {
-            tree::CompExpr::Value(n) => match n {
-                tree::Value::Integer(n) => emitter.context.i32_type().const_int(*n as u64, false).as_basic_value_enum(),
-                tree::Value::Char(c) => emitter.context.i8_type().const_int(*c as u64, false).as_basic_value_enum(),
-                tree::Value::Float(f) => emitter.context.f32_type().const_float(*f as f64).as_basic_value_enum(),
-                tree::Value::String(s) => emitter.emit_global_string(&mut s.to_owned(), "").as_basic_value_enum(),
-                _ => panic!("Error in CompExpr"),
-            }
+            tree::CompExpr::Value(val) => val.emit(emitter).unwrap(),
             tree::CompExpr::Variable(var) => var.emit(emitter).unwrap(),
             tree::CompExpr::FuncCall(function) => {
                 function.emit(emitter).unwrap_or(
@@ -445,6 +432,22 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CondExpr {
                 }
             }
             _ => panic!("Error in CondExpr"),
+        }
+    }
+}
+
+impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Value {
+    type Output = Option<BasicValueEnum<'ctx>>;
+    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
+        where 'ast: 'ctx
+    {
+        match self {
+            tree::Value::Integer(n) => Some(emitter.context.i32_type().const_int(*n as u64, false).as_basic_value_enum()),
+            tree::Value::Char(c) => Some(emitter.context.i8_type().const_int(*c as u64, false).as_basic_value_enum()),
+            tree::Value::Float(f) => Some(emitter.context.f32_type().const_float(*f as f64).as_basic_value_enum()),
+            tree::Value::String(s) => Some(emitter.emit_global_string(&mut s.to_owned(), "").as_basic_value_enum()),
+            tree::Value::Null => None,
+            _ => panic!("Error in Value"),
         }
     }
 }
