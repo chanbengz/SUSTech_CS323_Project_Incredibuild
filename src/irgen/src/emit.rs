@@ -3,6 +3,7 @@ use std::ops::Deref;
 use inkwell::AddressSpace;
 use inkwell::types::{BasicMetadataTypeEnum, BasicType};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, IntValue};
+use crate::azuki::Loop;
 use spl_ast::tree;
 use crate::azuki::Azuki;
 
@@ -238,7 +239,123 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Expr {
             tree::Expr::VarManagement(vars, _) => {
                 let _ = vars.iter().map(|var| var.emit(emitter)).collect::<Vec<Option<BasicValueEnum>>>();
             },
-            // if, while, for, ...
+            tree::Expr::If(if_expr, _) => {
+                match if_expr {
+                    tree::If::IfExpr(cond, if_body) => {
+                        let cond = cond.emit(emitter);
+                        let func = emitter.builder.get_insert_block().unwrap().get_parent().unwrap();
+                        let then_bb = emitter.context.append_basic_block(func, "then");
+                        let merge_bb = emitter.context.append_basic_block(func, "merge");
+                        emitter.builder.build_conditional_branch(cond.into_int_value(), then_bb, merge_bb).expect("Error in IfExpr CondExpr");
+                        emitter.builder.position_at_end(then_bb);
+                        if_body.emit(emitter);
+                        if emitter.no_terminator() {
+                            emitter.builder.build_unconditional_branch(merge_bb).expect("Error in IfExpr If Body");
+                        }
+                        // let _ =emitter.builder.build_unconditional_branch(merge_bb);
+                        emitter.builder.position_at_end(merge_bb);
+                    }
+                    tree::If::IfElseExpr(cond, if_body, else_body) => {
+                        let cond = cond.emit(emitter);
+                        let func = emitter.builder.get_insert_block().unwrap().get_parent().unwrap();
+                        let then_bb = emitter.context.append_basic_block(func, "then");
+                        let else_bb = emitter.context.append_basic_block(func, "else");
+                        let merge_bb = emitter.context.append_basic_block(func, "merge");
+
+                        emitter.builder.build_conditional_branch(cond.into_int_value(), then_bb, else_bb).expect("Error in IfElseExpr CondExpr");
+                        emitter.builder.position_at_end(then_bb);
+                        if_body.emit(emitter);
+                        if emitter.no_terminator() {
+                            emitter.builder.build_unconditional_branch(merge_bb).expect("Error in IfElseExpr If Body");
+                        }
+
+                        emitter.builder.position_at_end(else_bb);
+                        else_body.emit(emitter);
+                        if emitter.no_terminator() {
+                            emitter.builder.build_unconditional_branch(merge_bb).expect("Error in IfElseExpr Else Body");
+                        }
+                        // let _ =emitter.builder.build_unconditional_branch(merge_bb);
+                        emitter.builder.position_at_end(merge_bb);
+                    }
+                    _ => panic!("Error in Expr"),
+                }
+            }
+            tree::Expr::Loop(loop_expr, _) => {
+                match loop_expr {
+                    tree::Loop::WhileExpr(cond, body) => {
+                        let func = emitter.builder.get_insert_block().unwrap().get_parent().unwrap();
+                        let cond_bb = emitter.context.append_basic_block(func, "cond");
+                        let body_bb = emitter.context.append_basic_block(func, "body");
+                        let merge_bb = emitter.context.append_basic_block(func, "merge");
+
+                        emitter.builder.build_unconditional_branch(cond_bb).expect("Error in WhileLoop");
+                        emitter.builder.position_at_end(cond_bb);
+                        let cond = cond.emit(emitter);
+                        emitter.builder.build_conditional_branch(cond.into_int_value(), body_bb, merge_bb).expect("Error in WhileLoop");
+
+                        emitter.loops.push(Loop {
+                            loop_head: cond_bb,
+                            after_loop: merge_bb,
+                        }); // Used to document the loop information
+                        emitter.builder.position_at_end(body_bb);
+                        body.emit(emitter);
+
+                        if emitter.no_terminator() {
+                            emitter.builder.build_unconditional_branch(cond_bb).expect("Error in WhileLoop");
+                        }
+
+                        emitter.loops.pop();
+                        
+                        emitter.builder.position_at_end(merge_bb);
+                    }
+                    tree::Loop::ForExpr(init, cond, step, body) => {
+                        let func = emitter.builder.get_insert_block().unwrap().get_parent().unwrap();
+                        let init_bb = emitter.context.append_basic_block(func, "init");
+                        let cond_bb = emitter.context.append_basic_block(func, "cond");
+                        let body_bb = emitter.context.append_basic_block(func, "body");
+                        let step_bb = emitter.context.append_basic_block(func, "step");
+                        let merge_bb = emitter.context.append_basic_block(func, "merge");
+
+                        emitter.builder.build_unconditional_branch(init_bb).expect("Error in ForLoop");
+                        emitter.builder.position_at_end(init_bb);
+                        init.emit(emitter);
+                        emitter.builder.build_unconditional_branch(cond_bb).expect("Error in ForLoop");
+
+                        emitter.builder.position_at_end(cond_bb);
+                        let cond = cond.emit(emitter);
+                        emitter.builder.build_conditional_branch(cond.into_int_value(), body_bb, merge_bb).expect("Error in ForLoop");
+
+                        emitter.loops.push(Loop {
+                            loop_head: step_bb,
+                            after_loop: merge_bb,
+                        }); // Used to document the loop information
+
+                        emitter.builder.position_at_end(body_bb);
+                        body.emit(emitter);
+
+                        if emitter.no_terminator() {
+                            emitter.builder.build_unconditional_branch(step_bb).expect("Error in ForLoop");
+                        }
+
+                        emitter.builder.position_at_end(step_bb);
+                        step.emit(emitter);
+                        emitter.builder.build_unconditional_branch(cond_bb).expect("Error in ForLoop");
+
+                        emitter.loops.pop();
+                        
+                        emitter.builder.position_at_end(merge_bb);
+                    }
+                    _ => panic!("Error in Expr"),
+                }
+            }
+            tree::Expr::Break(_) => {
+                let loop_info = emitter.loops.last().expect("Error in Break");
+                emitter.builder.build_unconditional_branch(loop_info.after_loop).expect("Error in Break");
+            }
+            tree::Expr::Continue(_) => {
+                let loop_info = emitter.loops.last().expect("Error in Continue");
+                emitter.builder.build_unconditional_branch(loop_info.loop_head).expect("Error in Continue");
+            }
             _ => unimplemented!(),
         }
     }

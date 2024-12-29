@@ -40,7 +40,7 @@ pub fn emit_object_to_file(source: &str, ast: tree::Program, path: &str) {
 
 #[cfg(test)]
 mod tests {
-    use crate::emit_llvmir;
+    use crate::{emit_llvmir, emit_llvmir_to_file};
 
     #[test]
     fn gen_test_r00() {
@@ -68,5 +68,23 @@ mod tests {
         let ast = spl_parser::parse(source).unwrap();
         let ir = emit_llvmir("test_funccall.spl", ast);
         assert_eq!(ir, "; ModuleID = 'test_funccall.spl'\nsource_filename = \"test_funccall.spl\"\n\n@0 = internal global [4 x i8] c\"%d\\0A\\00\"\n\ndefine i32 @foo(i32 %a) {\nentry:\n  %a1 = alloca i32, align 4\n  store i32 %a, ptr %a1, align 4\n  %a2 = load i32, ptr %a1, align 4\n  %addtmp = add i32 %a2, 114000\n  ret i32 %addtmp\n}\n\ndefine i32 @main() {\nentry:\n  %foo = call i32 @foo(i32 514)\n  %0 = call i32 (ptr, ...) @printf(ptr @0, i32 %foo)\n  ret i32 0\n}\n\ndeclare i32 @printf(ptr, ...)\n");
+    }
+
+    #[test]
+    fn test_ifexpr(){
+        let source = "int main() { int a = 1; if (a == 1) { printf(\"%d\\n\", a); return 1; } else { printf(\"%d\\n\", a); return 0; } return 0;}";
+        let ast = spl_parser::parse(source).unwrap();
+        let ir = emit_llvmir("test_ifexpr.spl", ast.clone());
+        // emit_llvmir_to_file("test_ifexpr.spl", ast, "test_ifexpr.ll");
+        assert_eq!(ir, "; ModuleID = 'test_ifexpr.spl'\nsource_filename = \"test_ifexpr.spl\"\n\n@0 = internal global [4 x i8] c\"%d\\0A\\00\"\n@1 = internal global [4 x i8] c\"%d\\0A\\00\"\n\ndefine i32 @main() {\nentry:\n  %a = alloca i32, align 4\n  store i32 1, ptr %a, align 4\n  %a1 = load i32, ptr %a, align 4\n  %eqtmp = icmp eq i32 %a1, 1\n  br i1 %eqtmp, label %then, label %else\n\nthen:                                             ; preds = %entry\n  %a2 = load i32, ptr %a, align 4\n  %0 = call i32 (ptr, ...) @printf(ptr @0, i32 %a2)\n  ret i32 1\n\nelse:                                             ; preds = %entry\n  %a3 = load i32, ptr %a, align 4\n  %1 = call i32 (ptr, ...) @printf(ptr @1, i32 %a3)\n  ret i32 0\n\nmerge:                                            ; No predecessors!\n  ret i32 0\n}\n\ndeclare i32 @printf(ptr, ...)\n");
+    }
+
+    #[test]
+    fn test_whileexpr(){
+        let source = "int main() { int a = 1; while (a < 10) { a = a + 1; printf(\"%d\\n\", a); if(a == 4) {break;}} return a; }";
+        let ast = spl_parser::parse(source).unwrap();
+        let ir = emit_llvmir("test_whileexpr.spl", ast.clone());
+        // emit_llvmir_to_file("test_whileexpr.spl", ast, "test_whileexpr.ll");
+        assert_eq!(ir, "; ModuleID = 'test_whileexpr.spl'\nsource_filename = \"test_whileexpr.spl\"\n\n@0 = internal global [4 x i8] c\"%d\\0A\\00\"\n\ndefine i32 @main() {\nentry:\n  %a = alloca i32, align 4\n  store i32 1, ptr %a, align 4\n  br label %cond\n\ncond:                                             ; preds = %merge5, %entry\n  %a1 = load i32, ptr %a, align 4\n  %lttmp = icmp slt i32 %a1, 10\n  br i1 %lttmp, label %body, label %merge\n\nbody:                                             ; preds = %cond\n  %a2 = load i32, ptr %a, align 4\n  %addtmp = add i32 %a2, 1\n  store i32 %addtmp, ptr %a, align 4\n  %a3 = load i32, ptr %a, align 4\n  %0 = call i32 (ptr, ...) @printf(ptr @0, i32 %a3)\n  %a4 = load i32, ptr %a, align 4\n  %eqtmp = icmp eq i32 %a4, 4\n  br i1 %eqtmp, label %then, label %merge5\n\nmerge:                                            ; preds = %then, %cond\n  %a6 = load i32, ptr %a, align 4\n  ret i32 %a6\n\nthen:                                             ; preds = %body\n  br label %merge\n\nmerge5:                                           ; preds = %body\n  br label %cond\n}\n\ndeclare i32 @printf(ptr, ...)\n");
     }
 }

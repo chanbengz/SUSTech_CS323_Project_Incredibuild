@@ -125,6 +125,12 @@ docker run -it --rm -v $(pwd):/incredibuild incredibuild
 cargo run
 ```
 
+If you want to compile files in the third stage, you may have to use `-no-pie` to exiplicit disable PIE(Position Independent Executable) in the `gcc` command.
+
+```bash
+gcc -no-pie test_printf -o test
+```
+
 ### "Bare Metal" Mac
 
 If you're using Mac, make sure you have Rust and Cargo installed. Install LLVM environment by
