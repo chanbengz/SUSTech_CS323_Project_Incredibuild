@@ -6,7 +6,7 @@ use spl_irgen::{emit_llvmir_to_file, emit_object_to_file};
 
 fn main() -> Result<(), String> {
     let args = Command::new("Incredibuild")
-        .about("Compile SPL code to executable")
+        .about("Compile SPL code to assembly")
         .arg(Arg::new("input").index(1).required(true))
         .arg(Arg::new("output").short('o').long("output").required(false))
         .arg(Arg::new("debug").short('d').long("debug").required(false).action(ArgAction::SetTrue))
