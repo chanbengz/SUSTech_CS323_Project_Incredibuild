@@ -576,7 +576,7 @@ impl Walker {
                 self.update_line_with_span(span);
                 match function {
                     Function::FuncReference(name, _params) => {
-                        if (*name).as_str().eq("printf") {
+                        if (*name).as_str().eq("printf") || (*name).as_str().eq("scanf") {
                             return;
                         }
                     }

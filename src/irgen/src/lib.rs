@@ -3,7 +3,7 @@ mod checker;
 
 #[cfg(test)]
 mod tests {
-    use crate::emit::{emit_llvmir, emit_object};
+    use crate::emit::{emit_llvmir};
 
     #[test]
     fn gen_test_r00() {
@@ -26,9 +26,10 @@ mod tests {
     }
 
     #[test]
-    fn test_printf() {
-        let source = "int main() { printf(\"Hello, World!\\nThe Number is %d\", 42); return 0; } ";
+    fn test_funccall() {
+        let source = "int foo() { return 114+514; } int main() { printf(\"%d\\n\", foo()); return 0; } ";
         let ast = spl_parser::parse(source).unwrap();
-        emit_object("test_printf.spl", ast, "test_printf.o");
+        let ir = emit_llvmir("test_funccall.spl", ast);
+        assert_eq!(ir, "; ModuleID = 'test_funccall.spl'\nsource_filename = \"test_funccall.spl\"\n\n@0 = internal global [4 x i8] c\"%d\\0A\\00\"\n\ndefine i32 @foo() {\nentry:\n  ret i32 628\n}\n\ndefine i32 @main() {\nentry:\n  %foo = call i32 @foo()\n  %printf_tmp = call i32 (ptr, ...) @printf(ptr @0, i32 %foo)\n  ret i32 0\n}\n\ndeclare i32 @printf(ptr, ...)\n");
     }
 }

@@ -9,11 +9,11 @@ int fact(int n)
 int main()
 {
   int m, result;
-  m = read();
+  scanf("%d", &m);
   if (m > 1)
     result = fact(m);
   else
     result = 1;
-  write(result);
+  printf("%d\n", result);
   return 0;
 }

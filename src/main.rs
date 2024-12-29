@@ -33,13 +33,13 @@ fn main() -> Result<(), String> {
     }
 
     if args.get_flag("llvm-ir") {
-        let default_output = String::from("a.ll");
+        let default_output = format!("{}", source_path.replace(".spl", ".ll"));
         let output_path = args.get_one::<String>("output").unwrap_or(&default_output);
         emit_llvmir_to_file(&source_path, ast, &output_path);
     } else {
-        let default_output = String::from("a.out");
+        let default_output = format!("{}", source_path.replace(".spl", ".S"));
         let output_path = args.get_one::<String>("output").unwrap_or(&default_output);
-        emit_object(&source_path, ast, output_path);
+        emit_object_to_file(&source_path, ast, output_path);
     }
 
     Ok(())

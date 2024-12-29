@@ -1,8 +1,11 @@
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::{Read, Write};
 use std::ops::Deref;
 use std::path::Path;
 use inkwell as llvm;
 use inkwell::AddressSpace;
+use inkwell::memory_buffer::MemoryBuffer;
 use inkwell::module::Linkage;
 use inkwell::targets::*;
 use inkwell::types::{BasicType, BasicTypeEnum, IntType};
@@ -16,6 +19,15 @@ pub fn emit_llvmir(source: &str, ast: tree::Program) -> String {
     emitter.module.print_to_string().to_string()
 }
 
+pub fn emit_object(source: &str, ast: tree::Program) -> String {
+    let context = llvm::context::Context::create();
+    let mut emitter = Azuki::new(&context, source);
+    ast.emit(&mut emitter);
+    let mut s = String::new();
+    emitter.gen_code().as_slice().read_to_string(&mut s).expect("");
+    s
+}
+
 pub fn emit_llvmir_to_file(source: &str, ast: tree::Program, path: &str) {
     let context = llvm::context::Context::create();
     let mut emitter = Azuki::new(&context, source);
@@ -23,11 +35,10 @@ pub fn emit_llvmir_to_file(source: &str, ast: tree::Program, path: &str) {
     emitter.module.print_to_file(Path::new(path)).expect("Error in emit_llvmir_to_file");
 }
 
-pub fn emit_object(source: &str, ast: tree::Program, path: &str) {
-    let context = llvm::context::Context::create();
-    let mut emitter = Azuki::new(&context, source);
-    ast.emit(&mut emitter);
-    emitter.gen_code(Path::new(path));
+pub fn emit_object_to_file(source: &str, ast: tree::Program, path: &str) {
+    let s = emit_object(source, ast);
+    let mut file = File::create(path).expect("Error in emit_object_to_file");
+    file.write_all(s.as_bytes()).expect("Error in emit_object_to_file");
 }
 
 struct Azuki<'ast, 'ctx> {
@@ -37,6 +48,7 @@ struct Azuki<'ast, 'ctx> {
 
     pub scope: Vec<HashMap<&'ast str, (PointerValue<'ctx>, BasicTypeEnum<'ctx>)>>,
     printf: Option<llvm::values::FunctionValue<'ctx>>,
+    scanf: Option<llvm::values::FunctionValue<'ctx>>,
 }
 
 impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
@@ -49,6 +61,7 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
             module,
             scope: vec![HashMap::new()],
             printf: None,
+            scanf: None,
         }
     }
 
@@ -59,7 +72,18 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
             self.printf = Some(self.module.add_function("printf", i32type.fn_type(&[strtype], true), Some(Linkage::External)));
         }
 
-        self.builder.build_call(self.printf.unwrap(), args, "").expect("Error in emit_printf_call");
+        self.builder.build_call(self.printf.unwrap(), args, "printf_tmp").expect("Error in emit_printf_call");
+        self.context.i32_type()
+    }
+
+    fn emit_scanf_call(&mut self, args: &[BasicMetadataValueEnum]) -> IntType {
+        if self.scanf.is_none() {
+            let i32type = self.context.i32_type();
+            let strtype = self.context.ptr_type(AddressSpace::default()).into();
+            self.scanf = Some(self.module.add_function("scanf", i32type.fn_type(&[strtype], true), Some(Linkage::External)));
+        }
+
+        self.builder.build_call(self.scanf.unwrap(), args, "scanf_tmp").expect("Error in emit_scanf_call");
         self.context.i32_type()
     }
 
@@ -81,7 +105,7 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
         pointer_value.unwrap()
     }
 
-    fn gen_code(&mut self, path: &Path) {
+    fn gen_code(&mut self) -> MemoryBuffer {
         Target::initialize_all(&InitializationConfig::default());
         let triple = TargetMachine::get_default_triple();
         let target  = Target::from_triple(&triple).unwrap();
@@ -96,7 +120,7 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
             )
             .unwrap();
 
-        target_machine.write_to_file(&self.module, FileType::Object, path).unwrap();
+        target_machine.write_to_memory_buffer(&self.module, FileType::Assembly).unwrap()
     }
 
     fn get_var(&self, name: &str) -> Option<(&PointerValue<'ctx>, &BasicTypeEnum<'ctx>)> {
@@ -293,15 +317,18 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Function {
                 None
             },
             tree::Function::FuncReference(name, params) => {
+                let args = params.iter().map(|param| param.emit(emitter).into()).collect::<Vec<BasicMetadataValueEnum>>();
                 if (*name).as_str().eq("printf") {
-                    let args = params.iter().map(|param| param.emit(emitter).into()).collect::<Vec<BasicMetadataValueEnum>>();
                     emitter.emit_printf_call(args.as_slice());
+                    return None;
+                } else if (*name).as_str().eq("scanf") {
+                    emitter.emit_scanf_call(args.as_slice());
                     return None;
                 }
 
                 let func = emitter.module.get_function((*name).as_str()).expect("Function undeclared");
-                let llvm_args = params.iter().map(|param| param.emit(emitter).into()).collect::<Vec<BasicMetadataValueEnum>>();
-                Some(emitter.builder.build_call(func, llvm_args.as_slice(), (*name).as_str()).unwrap()
+                let args = params.iter().map(|param| param.emit(emitter).into()).collect::<Vec<BasicMetadataValueEnum>>();
+                Some(emitter.builder.build_call(func, args.as_slice(), (*name).as_str()).unwrap()
                     .try_as_basic_value()
                     .left()
                     .unwrap_or(emitter.context.i32_type().const_int(0, false).as_basic_value_enum()))
@@ -361,7 +388,8 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
         match self {
             tree::CompExpr::Value(n) => match n {
                 tree::Value::Integer(n) => emitter.context.i32_type().const_int(*n as u64, false).as_basic_value_enum(),
-                tree::Value::Float(n) => emitter.context.f32_type().const_float(*n as f64).as_basic_value_enum(),
+                tree::Value::Char(c) => emitter.context.i8_type().const_int(*c as u64, false).as_basic_value_enum(),
+                tree::Value::Float(f) => emitter.context.f32_type().const_float(*f as f64).as_basic_value_enum(),
                 tree::Value::String(s) => emitter.emit_global_string(&mut s.to_owned(), "").as_basic_value_enum(),
                 _ => panic!("Error in CompExpr"),
             }
@@ -371,6 +399,37 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
                     emitter.context.i32_type().const_int(0, false).as_basic_value_enum()
                 )
             },
+            tree::CompExpr::UnaryOperation(op, expr) => {
+                let var = if let tree::CompExpr::Variable(var) = expr.deref() {
+                    var
+                } else {
+                    panic!("Must be a pointer");
+                };
+                match op {
+                    tree::UnaryOperator::Ref => {
+                        let ptr = if let tree::Variable::VarReference(name, dims) = var {
+                            let (ptr, ty) = emitter.get_var(name.deref()).unwrap();
+                            let (ptr, ty) = (*ptr, *ty);
+                            if dims.is_empty() {
+                                ptr
+                            } else {
+                                let mut idx_vals = vec![emitter.context.i32_type().const_zero()];
+                                idx_vals.extend(dims.deref().iter().map(|dim| dim.emit(emitter).into_int_value()));
+                                unsafe {
+                                    emitter.builder.build_in_bounds_gep(ty, ptr, idx_vals.as_ref(), "index").unwrap()
+                                }
+                            }
+                        } else {
+                            panic!("Must be a pointer");
+                        };
+                        ptr.as_basic_value_enum()
+                    }
+                    tree::UnaryOperator::Deref => {
+                        var.emit(emitter).unwrap()
+                    }
+                    _ => panic!("Operator not supported in CompExpr"),
+                }
+            }
             tree::CompExpr::BinaryOperation(lhs, op, rhs) => {
                 let lhs = (*lhs.deref()).emit(emitter);
                 let rhs = (*rhs.deref()).emit(emitter);
@@ -417,6 +476,27 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
                                 emitter.builder.build_int_signed_rem(lhs, rhs.into_int_value(), "modtmp").unwrap().as_basic_value_enum(),
                             BasicValueEnum::FloatValue(lhs) =>
                                 emitter.builder.build_float_rem(lhs, rhs.into_float_value(), "modtmp").unwrap().as_basic_value_enum(),
+                            _ => panic!("Error in CompExpr"),
+                        }
+                    }
+                    tree::BinaryOperator::BitwiseAnd => {
+                        match lhs {
+                            BasicValueEnum::IntValue(lhs) =>
+                                emitter.builder.build_and(lhs, rhs.into_int_value(), "andtmp").unwrap().as_basic_value_enum(),
+                            _ => panic!("Error in CompExpr"),
+                        }
+                    }
+                    tree::BinaryOperator::BitwiseOr => {
+                        match lhs {
+                            BasicValueEnum::IntValue(lhs) =>
+                                emitter.builder.build_or(lhs, rhs.into_int_value(), "ortmp").unwrap().as_basic_value_enum(),
+                            _ => panic!("Error in CompExpr"),
+                        }
+                    }
+                    tree::BinaryOperator::BitwiseXor => {
+                        match lhs {
+                            BasicValueEnum::IntValue(lhs) =>
+                                emitter.builder.build_xor(lhs, rhs.into_int_value(), "xortmp").unwrap().as_basic_value_enum(),
                             _ => panic!("Error in CompExpr"),
                         }
                     }
