@@ -6,6 +6,7 @@ use inkwell::module::Linkage;
 use inkwell::targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine};
 use inkwell::types::{BasicTypeEnum, IntType};
 use inkwell::values::{BasicMetadataValueEnum, PointerValue};
+use inkwell::basic_block::BasicBlock;
 
 pub(crate) struct Azuki<'ast, 'ctx> {
     pub context: &'ctx llvm::context::Context,
@@ -13,6 +14,7 @@ pub(crate) struct Azuki<'ast, 'ctx> {
     pub module: llvm::module::Module<'ctx>,
 
     pub scope: Vec<HashMap<&'ast str, (PointerValue<'ctx>, BasicTypeEnum<'ctx>)>>,
+    pub loops: Vec<Loop<'ctx>>,
     printf: Option<llvm::values::FunctionValue<'ctx>>,
     scanf: Option<llvm::values::FunctionValue<'ctx>>,
 }
@@ -26,6 +28,7 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
             builder: context.create_builder(),
             module,
             scope: vec![HashMap::new()],
+            loops: Vec::new(),
             printf: None,
             scanf: None,
         }
@@ -97,4 +100,17 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
         }
         None
     }
+
+    pub(crate) fn no_terminator(&self) -> bool {
+        let block = self.builder.get_insert_block();
+        let terminator = block.unwrap().get_terminator();
+        terminator.is_none()
+    }
+}
+
+pub struct Loop<'ctx> {
+    /// Saves the loop_start basic block (for `continue`)
+    pub loop_head: BasicBlock<'ctx>,
+    /// Saves the after_loop basic block (for `break`)
+    pub after_loop: BasicBlock<'ctx>,
 }
