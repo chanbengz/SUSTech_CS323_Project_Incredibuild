@@ -26,14 +26,36 @@ SPL(SUSTech Programming Language) Compiler in Rust
 At first, you need to setup the environment by installing Rust, Cargo and LLVM, please follow instruction in [development](#development) section. 
 Then you can build the project by running
 
+```
+cargo build
+```
+
+and emit the assembly code by running
+
 ```bash
-cargo run /path/to/your/spl/file
+cargo run /path/to/input.spl -o /path/to/output.S
+```
+
+or check the LLVM IR by running
+
+```bash
+cargo run /path/to/input.spl --llvm-ir -o /path/to/output.ll
+```
+
+Finally, to execute the program, you can use LLVM's interpreter or compile the assembly
+
+```bash
+cc /path/to/output.S -o /path/to/output
+./output
+
+# or
+lli /path/to/output.ll
 ```
 
 > [!NOTE]
 > Some of the functionalities are weird in release mode.
 
-See `cargo run` for more options.
+See `target/debug/incredibuild -h` for more options.
 
 ## File structure
 

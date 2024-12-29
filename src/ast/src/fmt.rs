@@ -127,7 +127,7 @@ impl fmt::Display for BinaryOperator {
             BinaryOperator::Sub => write!(f, "-"),
             BinaryOperator::Mul => write!(f, "*"),
             BinaryOperator::Div => write!(f, "/"),
-            BinaryOperator::Pow => write!(f, "^"),
+            BinaryOperator::BitwiseXor => write!(f, "^"),
             BinaryOperator::Mod => write!(f, "%"),
             BinaryOperator::And => write!(f, "&&"),
             BinaryOperator::Or => write!(f, "||"),

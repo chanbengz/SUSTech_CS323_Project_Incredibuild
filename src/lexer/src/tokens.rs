@@ -89,7 +89,7 @@ pub enum Token {
     #[token("%")]
     OpMod,
     #[token("^")]
-    OpPow,
+    OpXor,
     #[token("&&", priority = 5)]
     OpAnd,
     #[token("||", priority = 5)]
@@ -286,7 +286,7 @@ impl fmt::Display for Token {
             Token::OpMul => write!(f, "*"),
             Token::OpDiv => write!(f, "/"),
             Token::OpMod => write!(f, "%"),
-            Token::OpPow => write!(f, "^"),
+            Token::OpXor => write!(f, "^"),
             Token::OpAnd => write!(f, "&&"),
             Token::OpOr => write!(f, "||"),
             Token::OpNot => write!(f, "!"),

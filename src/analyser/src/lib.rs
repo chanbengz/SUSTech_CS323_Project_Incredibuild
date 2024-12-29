@@ -13,6 +13,7 @@ pub mod manager;
 mod tests {
     use std::fs::File;
     use std::io::Read;
+    use spl_parser::parse_from_file;
     use crate::walker::Walker;
 
     fn assert_analyze_from_file(file_path: &str, out_path: &str){
@@ -21,8 +22,9 @@ mod tests {
         out_file.read_to_string(&mut out_content)
             .expect("Unable to read file");
         let expected = out_content.trim();
+        let ast = parse_from_file(file_path).unwrap();
 
-        let mut walker = Walker::new(file_path, true);
+        let mut walker = Walker::new(ast, file_path,true);
 
         walker.traverse();
         let _table = walker.get_tables();

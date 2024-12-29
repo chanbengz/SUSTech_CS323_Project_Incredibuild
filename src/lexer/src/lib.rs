@@ -206,7 +206,7 @@ mod test {
                 (OpMul, "*"),
                 (OpDiv, "/"),
                 (OpMod, "%"),
-                (OpPow, "^"),
+                (OpXor, "^"),
                 (OpPlus, "+"),
                 (OpMinus, "-"),
                 (OpLessThan, "<"),
