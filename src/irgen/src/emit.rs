@@ -173,6 +173,10 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Function {
                 }
 
                 body.emit(emitter);
+                let last_bb = emitter.builder.get_insert_block().unwrap();
+                if last_bb.get_last_instruction().is_none() { // empty block, removed
+                    last_bb.remove_from_function().expect("Cannot remove last block");
+                }
                 emitter.scope.pop();
                 None
             },
@@ -247,7 +251,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Expr {
                         if emitter.no_terminator() {
                             emitter.builder.build_unconditional_branch(merge_bb).expect("Error in IfExpr If Body");
                         }
-                        // let _ =emitter.builder.build_unconditional_branch(merge_bb);
+
                         emitter.builder.position_at_end(merge_bb);
                     }
                     tree::If::IfElseExpr(cond, if_body, else_body) => {
@@ -269,7 +273,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Expr {
                         if emitter.no_terminator() {
                             emitter.builder.build_unconditional_branch(merge_bb).expect("Error in IfElseExpr Else Body");
                         }
-                        // let _ =emitter.builder.build_unconditional_branch(merge_bb);
+
                         emitter.builder.position_at_end(merge_bb);
                     }
                     _ => panic!("Error in Expr"),

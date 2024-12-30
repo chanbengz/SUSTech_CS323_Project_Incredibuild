@@ -43,17 +43,20 @@ mod tests {
     use std::fs::File;
     use std::io::Read;
     #[allow(unused_imports)]
-    use crate::{emit_llvmir, emit_llvmir_to_file};
+    use crate::{emit_llvmir, emit_llvmir_to_file, emit_object};
 
-    #[test]
-    fn gen_test_r00() {
+    fn test_from_file(source_path: &str, expected_path: &str, ir: bool) {
         let mut source = String::new();
         let mut expected = String::new();
-        File::open("../../test/test_0_r00.spl").unwrap().read_to_string(&mut source).unwrap();
-        File::open("../../test/test_0_r00.ll").unwrap().read_to_string(&mut expected).unwrap();
+        File::open(source_path).unwrap().read_to_string(&mut source).unwrap();
+        File::open(expected_path).unwrap().read_to_string(&mut expected).unwrap();
         let ast = spl_parser::parse(&source).unwrap();
-        let ir = emit_llvmir("test_0_r00.spl", ast);
-        assert_eq!(ir, expected);
+        let res = if ir {
+            emit_llvmir(source_path.split("/").last().unwrap(), ast)
+        } else {
+            emit_object(source_path.split("/").last().unwrap(), ast)
+        };
+        assert_eq!(res, expected);
     }
 
     #[test]
@@ -105,5 +108,19 @@ mod tests {
         let ir = emit_llvmir("test_forexpr.spl", ast.clone());
         // emit_llvmir_to_file("test_forexpr.spl", ast, "test_forexpr.ll");
         assert_eq!(ir, "; ModuleID = 'test_forexpr.spl'\nsource_filename = \"test_forexpr.spl\"\n\n@0 = internal global [4 x i8] c\"%d\\0A\\00\"\n\ndefine i32 @main() {\nentry:\n  %a = alloca i32, align 4\n  store i32 1, ptr %a, align 4\n  br label %init\n\ninit:                                             ; preds = %entry\n  %i = alloca i32, align 4\n  store i32 0, ptr %i, align 4\n  br label %cond\n\ncond:                                             ; preds = %step, %init\n  %i1 = load i32, ptr %i, align 4\n  %lttmp = icmp slt i32 %i1, 10\n  br i1 %lttmp, label %body, label %merge\n\nbody:                                             ; preds = %cond\n  %a2 = load i32, ptr %a, align 4\n  %addtmp = add i32 %a2, 1\n  store i32 %addtmp, ptr %a, align 4\n  %a3 = load i32, ptr %a, align 4\n  %0 = call i32 (ptr, ...) @printf(ptr @0, i32 %a3)\n  %a4 = load i32, ptr %a, align 4\n  %eqtmp = icmp eq i32 %a4, 4\n  br i1 %eqtmp, label %then, label %merge5\n\nstep:                                             ; preds = %merge5\n  %i6 = load i32, ptr %i, align 4\n  %addtmp7 = add i32 %i6, 1\n  store i32 %addtmp7, ptr %i, align 4\n  br label %cond\n\nmerge:                                            ; preds = %then, %cond\n  %a8 = load i32, ptr %a, align 4\n  ret i32 %a8\n\nthen:                                             ; preds = %body\n  br label %merge\n\nmerge5:                                           ; preds = %body\n  br label %step\n}\n\ndeclare i32 @printf(ptr, ...)\n");
+    }
+
+    #[test]
+    fn gen_test_r00() {
+        test_from_file("../../test/test_0_r00.spl", "../../test/test_0_r00.ll", true);
+    }
+
+    #[test]
+    fn test_phase3() {
+        for i in 1..=6 {
+            let source_path = format!("../../test/phase3/test_3_r{:02}.spl", i);
+            let expected_path = format!("../../test/phase3/test_3_r{:02}.ll", i);
+            test_from_file(&source_path, &expected_path, true);
+        }
     }
 }

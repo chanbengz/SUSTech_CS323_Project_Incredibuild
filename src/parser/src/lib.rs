@@ -43,13 +43,7 @@ pub fn parse_from_file(source_path: &str) -> Result<tree::Program, String> {
 mod tests {
     use std::fs::File;
     use std::io::Read;
-    use crate::grammar::CompExprParser;
-    use crate::grammar::CondExprParser;
-    use crate::grammar::ParaDecsParser;
-    use crate::grammar::FuncDecParser;
-    use crate::grammar::BodyParser;
-    use crate::grammar::StmtParser;
-    use crate::grammar::ProgramParser;
+    use crate::grammar::*;
 
     enum Parser {
         CompExprParser,
@@ -234,13 +228,13 @@ mod tests {
 
     #[test]
     fn test_phase1() {
-        for i in 1..13 {
+        for i in 1..=12 {
             assert_parse_from_file(Parser::ProgramParser, 
                 &format!("../../test/phase1/basic/test_1_r{:0>2}.spl", i),
                 &format!("../../test/phase1/basic/test_1_r{:0>2}.out", i)
             );
         }
-        for i in 1..14 {
+        for i in 1..=13 {
             assert_parse_from_file(Parser::ProgramParser,
                 &format!("../../test/phase1/extra/test_1_s{:0>2}.spl", i),
                 &format!("../../test/phase1/extra/test_1_s{:0>2}.out", i)
