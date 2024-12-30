@@ -21,11 +21,11 @@ int isPalindrome(int num) {
 
 int main() {
     int number;
-    number = read(); 
+    scanf("%d", &number);
     if (isPalindrome(number)==1) {
-        write(1);
+        printf("Yes\n");
     } else {
-        write(-1);
+        printf("No\n");
     }
 
     return 0;

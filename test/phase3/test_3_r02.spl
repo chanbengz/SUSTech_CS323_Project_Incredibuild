@@ -21,9 +21,8 @@ int calculateBinomialCoefficient(int row, int col) {
 
 int main() {
     int r, c, coe;
-    r = read();
-    c = read();
+    scanf("%d %d", &r, &c);
     coe = calculateBinomialCoefficient(r, c);
-    write(coe);
+    printf("%d\n", coe);
     return 0;
 }
