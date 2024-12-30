@@ -1,10 +1,7 @@
-use std::any::Any;
 use std::collections::HashMap;
-use std::ops::{Add, Deref};
-use std::path::MAIN_SEPARATOR;
-use inkwell::execution_engine::JitFunction;
+use std::ops::Deref;
 use inkwell::AddressSpace;
-use inkwell::types::{AnyType, AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
+use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, IntValue, ArrayValue};
 use crate::azuki::Loop;
 use spl_ast::tree;
