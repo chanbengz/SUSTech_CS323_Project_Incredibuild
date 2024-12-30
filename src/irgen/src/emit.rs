@@ -356,7 +356,10 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Expr {
                 let loop_info = emitter.loops.last().expect("Error in Continue");
                 emitter.builder.build_unconditional_branch(loop_info.loop_head).expect("Error in Continue");
             }
-            _ => unimplemented!(),
+            tree::Expr::Body(body, _ ){
+                body.emit(emitter);
+            }
+            tree::Expr::Error => panic!("Error in Expr"),
         }
     }
 }
@@ -548,7 +551,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CondExpr {
                     _ => panic!("Error in CondExpr"),
                 }
             }
-            _ => panic!("Error in CondExpr"),
+            tree::CondExpr::Error => panic!("Error in CondExpr"),
         }
     }
 }
