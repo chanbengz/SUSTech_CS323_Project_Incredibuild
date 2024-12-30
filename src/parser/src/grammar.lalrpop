@@ -210,28 +210,63 @@ pub Stmt: tree::Statement = {
             }
         )
     },
-    <vl:@L> <global: VarDef> <vr: @R> <l:@L> <semicolon:";"?> <r:@R> => {
-        if semicolon == None {
-            let error = ErrorRecovery {
-                error: ParseError::User {
-                    error: LexicalError::MissingLexeme(Span {
-                        source: source.to_string(),
-                        start: l,
-                        end: l + 1
-                    }, "semicolon ';'".to_string())
+    <l:@L> <spec:Specifier> <var: VarDecs> ";" <r:@R> => {
+        let mut variables = Vec::new();
+        let str_ = if let tree::Value::Struct(ref s) = spec { s.clone() } else { "".to_string() };
+        var.iter().for_each(|x| {
+            match x {
+                tree::Variable::VarDeclaration(name, value, size) => {
+                    if spec == tree::Value::Struct(str_.clone()) {
+                        variables.push(tree::Variable::StructDeclaration(
+                            Box::new(str_.clone()),
+                            name.clone(),
+                            size.to_owned()
+                        ));
+                    } else {
+                        variables.push(tree::Variable::VarDeclaration(
+                            name.clone(), 
+                            Box::new(spec.to_owned()), 
+                            size.clone()
+                        ));
+                    }
                 },
-                dropped_tokens: Vec::new(), // or specify the dropped tokens
-            };
-            errors.push(error);
-        }
-        tree::Statement::GlobalVariable(
-            global,
-            Span {
-                source: source.to_string(),
-                start: vl,
-                end: vr
+                tree::Variable::VarAssignment(variable, value) => {
+                    match variable.as_ref() {
+                        tree::Variable::VarReference(name, size) => {
+                            if spec != tree::Value::Struct(str_.clone()) {
+                                variables.push(tree::Variable::VarAssignment(
+                                    Box::new(tree::Variable::VarDeclaration(
+                                        name.clone(), 
+                                        Box::new(spec.to_owned()), 
+                                        size.clone()
+                                    )),
+                                    value.clone()
+                                ));
+                            }
+                        },
+                        _ => {
+                            let error = ErrorRecovery {
+                                error: ParseError::User {
+                                    error: LexicalError::StatementError(Span {
+                                        source: source.to_string(),
+                                        start: 0,
+                                        end: 0
+                                    }, "Invalid variable assignment".to_string())
+                                },
+                                dropped_tokens: Vec::new(),
+                            };
+                            errors.push(error);
+                        }
+                    };
+                },
+                _ => {}
             }
-        )
+        });
+        tree::Statement::GlobalVariable(variables, Span {
+            source: source.to_string(),
+            start: l,
+            end: r
+        })
     },
     <l:@L> <missing:!> <r:@R> ";" => {
         let error = ErrorRecovery {

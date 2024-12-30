@@ -1,8 +1,11 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::ops::{Add, Deref};
+use std::path::MAIN_SEPARATOR;
+use inkwell::execution_engine::JitFunction;
 use inkwell::AddressSpace;
-use inkwell::types::{BasicMetadataTypeEnum, BasicType};
-use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, IntValue};
+use inkwell::types::{AnyType, AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, IntValue, ArrayValue};
 use crate::azuki::Loop;
 use spl_ast::tree;
 use crate::azuki::Azuki;
@@ -22,7 +25,6 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Program {
                 for part in parts {
                     part.emit(emitter);
                 }
-                None
             }
             tree::Program::Error => panic!("Error in Program"),
         }
@@ -42,40 +44,72 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::ProgramPart {
 }
 
 impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
-    type Output = Option<BasicValueEnum<'ctx>>;
+    type Output = ();
     fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
         where 'ast:'ctx
     {
         match self {
-            tree::Statement::GlobalVariable(vars, ..) => {
+            tree::Statement::GlobalVariable(vars, _) => {
                 for var in vars {
                     match var {
                         tree::Variable::VarAssignment(var, expr) => {
                             match var.as_ref() {
-                                tree::Variable::VarReference(name, dims) => {
+                                tree::Variable::VarDeclaration(name, ty, dims) => {
+                                    // Dimensions reference
                                     let dims = dims.deref().iter().rev().map(|dim|
                                         dim.emit(emitter).into_int_value()).collect::<Vec<IntValue>>();
 
-                                    let assign_vals = expr.as_ref().iter().map(|e| e.emit(emitter)).collect::<Vec<BasicValueEnum>>();
-                                    let global_variable = emitter.module.get_global(name.deref()).unwrap();
-                                    let (ptr, ty) = (global_variable.as_pointer_value(), global_variable.get_value_type().try_into().unwrap());
-                                    if dims.is_empty() {
-                                        return Some(emitter.builder.build_load(ty, ptr, name.deref()).unwrap().as_basic_value_enum());
-                                    } else {
-                                        let mut idx_vals = vec![emitter.context.i32_type().const_zero()];
-                                        idx_vals.extend(dims.deref().iter().map(|dim| dim.emit(emitter).into_int_value()));
-
-                                        unsafe {
-                                            emitter.builder.build_in_bounds_gep(
-                                                ty,
-                                                ptr,
-                                                idx_vals.as_ref(),
-                                                "index_access"
-                                            ).as_basic_value_enum()
+                                    let typ = if dims.is_empty() {
+                                        match (*ty).deref() {
+                                            tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
+                                            tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
+                                            tree::Value::Pointer(_) => emitter.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
+                                            _ => panic!("Type not supported"),
                                         }
-                                        emitter.builder.build_store(ptr, val).expect("");
-                                        for val in assign_vals {
+                                    } else {
+                                        dims.iter().fold(
+                                            emitter.context.i32_type().as_basic_type_enum(),
+                                            |acc, len| acc.array_type(len.get_zero_extended_constant().unwrap() as u32)
+                                                .as_basic_type_enum()
+                                        )
+                                    };
+                                    match typ {
+                                        BasicTypeEnum::ArrayType(_) => {
+                                            // Get the array values
+                                            let assign_vals = expr.deref().iter().map(|expr| expr.emit(emitter)).collect::<Vec<BasicValueEnum>>();
+                                            
+                                            let mut dims = dims.iter();
+                                            let top_size = dims.next().unwrap().get_zero_extended_constant().unwrap() as u32;
 
+                                            let mut arrays = assign_vals
+                                                .chunks(top_size as usize)
+                                                .map(|a| emitter.context.i32_type().const_array(a.into_iter().map(|v| v.into_int_value()).collect::<Vec<IntValue>>().as_slice()))
+                                                .collect::<Vec<ArrayValue>>();
+
+                                            let mut typ_t = emitter.context.i32_type().array_type(top_size);
+
+                                            // If it is a multidimensional array
+                                            for dim in dims {
+                                                println!("{:?}", dim);
+                                                let size = dim.get_zero_extended_constant().unwrap() as u32;
+                                                arrays = arrays
+                                                    .chunks(size as usize)
+                                                    .map(|a| typ_t.const_array(a))
+                                                    .collect::<Vec<ArrayValue>>();
+                                                typ_t = typ_t.array_type(size);
+                                            }
+                                            // Get the global variable and its pointer and its type (ArrayType if it is an array)
+                                            let global = emitter.module.add_global(typ_t, Some(AddressSpace::default()), name.deref());
+                                            global.set_initializer(&arrays.as_slice()[0]);
+                                        },
+                                        BasicTypeEnum::PointerType(_) => {
+                                            unimplemented!()
+                                        },
+                                        BasicTypeEnum::StructType(_) => {
+                                            unimplemented!()
+                                        },
+                                        _ => {
+                                            unimplemented!()
                                         }
                                     }
                                 }
@@ -100,9 +134,8 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
                                         .as_basic_type_enum()
                                 )
                             };
-                            let global = emitter.module.add_global(typ, Some(AddressSpace::default()), name.deref());
+                            let global = emitter.module.add_global(typ, None, name.deref());
                             global.set_initializer(&typ.const_zero());
-                            None
                         },
                         _ => unimplemented!()
                     }
@@ -123,7 +156,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
     {
         match self {
             tree::Variable::VarAssignment(var, expr) => {
-                let val = expr.deref().first()?.emit(emitter).into(); // TODO: Array assignment
+                let val: BasicValueEnum = expr.deref().first()?.emit(emitter).into(); // TODO: Array assignment
                 match var.deref() {
                     tree::Variable::VarReference(name, _dims) => {
                         let ptr = emitter.get_var(name.deref()).unwrap().0;
@@ -135,7 +168,6 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
             }
             tree::Variable::VarReference(name, dims) => {
                 let (ptr, ty) = emitter.get_var(name.deref()).unwrap();
-                // let (ptr, ty) = (*ptr, *ty);
                 if dims.is_empty() {
                     Some(emitter.builder.build_load(ty, ptr, name.deref()).unwrap().as_basic_value_enum().into())
                 } else {

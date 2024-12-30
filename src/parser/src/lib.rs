@@ -210,7 +210,7 @@ mod tests {
         assert_parse(Parser::StmtParser, "int a;", 
         "GlobalVariable: [Variable Declaration: a = [0: u32] with dimensions []]");
         assert_parse(Parser::StmtParser, "int a = 1, b = 2;",
-        "GlobalVariable: [Variable Declaration: a = [0: u32] with dimensions [], Variable Assignment: a = 1: u32, Variable Declaration: b = [0: u32] with dimensions [], Variable Assignment: b = 2: u32]");
+        "GlobalVariable: [Variable Assignment: Variable Declaration: a = [0: u32] with dimensions [] = 1: u32, Variable Assignment: Variable Declaration: b = [0: u32] with dimensions [] = 2: u32]");
         assert_parse(Parser::StmtParser, "struct obj { int a; char b; };", 
         "Struct: Struct Definition: obj with [Variable Declaration: a = [0: u32] with dimensions [], Variable Declaration: b = [ : char] with dimensions []]");
         assert_parse(Parser::StmtParser, "#include \"../hi.h\"", "Include: ../hi.h");
