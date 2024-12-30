@@ -5,11 +5,11 @@ int main() {
     c = 3;
     tu1 = 1;
     tu2 = 1;
-    m = read();
+    scanf("%d", &m);
     if(m < 1)
-        write(0);
+        printf("0\n");
     else if(m == 1||m == 2)
-        write(1);
+        printf("1\n");
     else if(m > 2) {
         i = 3;
         while(i <= m) {
@@ -18,7 +18,7 @@ int main() {
             tu2 = tu3;
             i = i + 1;
         }
-        write(tu3);
+        printf("%d\n", tu3);
     }
     return 0;
 }

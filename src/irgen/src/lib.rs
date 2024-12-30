@@ -40,10 +40,20 @@ pub fn emit_object_to_file(source: &str, ast: tree::Program, path: &str) {
 
 #[cfg(test)]
 mod tests {
+    use std::fs::File;
+    use std::io::Read;
+    #[allow(unused_imports)]
     use crate::{emit_llvmir, emit_llvmir_to_file};
 
     #[test]
     fn gen_test_r00() {
+        let mut source = String::new();
+        let mut expected = String::new();
+        File::open("../../test/test_0_r00.spl").unwrap().read_to_string(&mut source).unwrap();
+        File::open("../../test/test_0_r00.ll").unwrap().read_to_string(&mut expected).unwrap();
+        let ast = spl_parser::parse(&source).unwrap();
+        let ir = emit_llvmir("test_0_r00.spl", ast);
+        assert_eq!(ir, expected);
     }
 
     #[test]

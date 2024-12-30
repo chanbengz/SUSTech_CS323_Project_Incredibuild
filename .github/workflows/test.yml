@@ -24,13 +24,13 @@ jobs:
       with:
         version: "17.0"
 
-    - name: Test Parser
-      run: cargo test --verbose
-      working-directory: src/parser
-
     - name: Test Lexer
       run: cargo test --verbose
       working-directory: src/lexer
+
+    - name: Test Parser
+      run: cargo test --verbose
+      working-directory: src/parser
 
     - name: Test Analyzer
       run: cargo test --verbose

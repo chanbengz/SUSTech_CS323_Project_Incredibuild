@@ -1,27 +1,30 @@
+; ModuleID = 'test_0_r00.spl'
 source_filename = "test_0_r00.spl"
 
-define i32 @main() #0 {
-  %1 = alloca i32, align 4
-  %2 = alloca i32, align 4
-  store i32 0, ptr %1, align 4
-  store i32 3, ptr %2, align 4
-  br label %3
+define i32 @main() {
+entry:
+  %a = alloca i32, align 4
+  store i32 3, ptr %a, align 4
+  br label %cond
 
-3:                                                ; preds = %0, %9
-  %4 = load i32, ptr %2, align 4
-  %5 = add nsw i32 %4, 1
-  store i32 %5, ptr %2, align 4
-  %6 = load i32, ptr %2, align 4
-  %7 = icmp eq i32 %6, 5
-  br i1 %7, label %8, label %9
+cond:                                             ; preds = %merge3, %entry
+  br i1 true, label %body, label %merge
 
-8:                                                ; preds = %3
-  br label %10
+body:                                             ; preds = %cond
+  %a1 = load i32, ptr %a, align 4
+  %addtmp = add i32 %a1, 1
+  store i32 %addtmp, ptr %a, align 4
+  %a2 = load i32, ptr %a, align 4
+  %eqtmp = icmp eq i32 %a2, 5
+  br i1 %eqtmp, label %then, label %merge3
 
-9:                                                ; preds = %3
-  br label %3
+merge:                                            ; preds = %then, %cond
+  %a4 = load i32, ptr %a, align 4
+  ret i32 %a4
 
-10:                                               ; preds = %8
-  %11 = load i32, ptr %2, align 4
-  ret i32 %11
+then:                                             ; preds = %body
+  br label %merge
+
+merge3:                                           ; preds = %body
+  br label %cond
 }
