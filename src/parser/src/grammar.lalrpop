@@ -21,6 +21,7 @@ ProgramPart: tree::ProgramPart = {
 // Some useful declarations in the beginning of the program
 pub ParaDecs = Comma<ParaDec>;
 StructDecs = Comma<StructDec>;
+ArrayDecs = Comma<CompExpr>;
 
 Comma<T>: Vec<T> = {
     <l:@L> <mut v:Comma<T>> "," <e:T?> <r:@R> => match e {
@@ -45,10 +46,7 @@ Comma<T>: Vec<T> = {
             v
         }
     },
-    <e:T?> => match e {
-        Some(e) => vec![e],
-        None => Vec::new()
-    }
+    <e:T> => vec![e],
 };
 
 ArgList: Vec<Box<tree::CompExpr>> = {
@@ -297,7 +295,7 @@ FieldsDec: Vec<tree::Variable> = {
 * 3. Body: { Expr* }
 */
 pub FuncDec: Box<tree::Function> = {
-    <ret: Specifier> <name:Identifier> <lb:"("> <params:ParaDecs> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> "}" => {
+    <ret: Specifier> <name:Identifier> <lb:"("> <params:ParaDecs?> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> "}" => {
         if rb == None {
             let error = ErrorRecovery {
                 error: ParseError::User {
@@ -314,13 +312,13 @@ pub FuncDec: Box<tree::Function> = {
         } else {
             Box::new(tree::Function::FuncDeclaration(
                 Box::new(name),
-                params,
+                params.unwrap_or(Vec::new()),
                 Box::new(ret),
                 body
             ))
         }
     },
-    <ret: Specifier> <name:Identifier> <lb:"("> <params:ParaDecs> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> ! <vr:@R> => {
+    <ret: Specifier> <name:Identifier> <lb:"("> <params:ParaDecs?> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> ! <vr:@R> => {
         let error = ErrorRecovery {
             error: ParseError::User {
                 error: LexicalError::MissingLexeme(Span {
@@ -334,7 +332,7 @@ pub FuncDec: Box<tree::Function> = {
         errors.push(error);
         Box::new(tree::Function::Error)
     },
-    <ret: Specifier> <name:Identifier> <lb:"("> <params:ParaDecs> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> <vl:@L> ! <vr:@R> "{" Expr+ "}" "}" => {
+    <ret: Specifier> <name:Identifier> <lb:"("> <params:ParaDecs?> <l:@L> <rb:")"?> <r:@R> "{" <body:Body> <vl:@L> ! <vr:@R> "{" Expr+ "}" "}" => {
         let error = ErrorRecovery {
             error: ParseError::User {
                 error: LexicalError::StatementError(Span {
@@ -804,7 +802,7 @@ VarManagement: tree::Expr = {
         tree::Expr::VarManagement(
             vec![tree::Variable::VarAssignment(
                 Box::new(tree::Variable::StructReference(Box::new(s))),
-                val
+                Box::new(vec![*val])
             )],
             Span {
                 source: source.to_string(),
@@ -821,11 +819,11 @@ VarManagement: tree::Expr = {
         tree::Expr::VarManagement(
             vec![tree::Variable::VarAssignment(
                 Box::new(tree::Variable::VarReference(Box::new(lhs.clone()), Box::new(dims.clone()))),
-                Box::new(tree::CompExpr::BinaryOperation(
+                Box::new(vec![tree::CompExpr::BinaryOperation(
                     Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(lhs.clone()), Box::new(dims.clone())))),
                     tree::BinaryOperator::Add,
                     Box::new(tree::CompExpr::Value(tree::Value::Integer(1)))
-                )),
+                )]),
             )],
             Span {
                 source: source.to_string(),
@@ -842,11 +840,11 @@ VarManagement: tree::Expr = {
         tree::Expr::VarManagement(
             vec![tree::Variable::VarAssignment(
                 Box::new(tree::Variable::VarReference(Box::new(lhs.clone()), Box::new(dims.clone()))),
-                Box::new(tree::CompExpr::BinaryOperation(
+                Box::new(vec![tree::CompExpr::BinaryOperation(
                     Box::new(tree::CompExpr::Variable(tree::Variable::VarReference(Box::new(lhs.clone()), Box::new(dims.clone())))),
                     tree::BinaryOperator::Sub,
                     Box::new(tree::CompExpr::Value(tree::Value::Integer(1)))
-                )),
+                )]),
             )],
             Span {
                 source: source.to_string(),
@@ -899,7 +897,7 @@ VarDef: Vec<tree::Variable> = {
         }
         variables
     },
-    <spec: Specifier> <var: VarDecs> => {
+    <spec:Specifier> <var: VarDecs> => {
         let mut variables = Vec::new();
         let str_ = if let tree::Value::Struct(ref s) = spec { s.clone() } else { "".to_string() };
         var.iter().for_each(|x| {
@@ -920,9 +918,19 @@ VarDef: Vec<tree::Variable> = {
                     }
                 },
                 tree::Variable::VarAssignment(variable, value) => {
-                    let name = match &**variable {
+                    match variable.as_ref() {
                         tree::Variable::VarReference(name, size) => {
-                            *name.clone()
+                            if spec != tree::Value::Struct(str_.clone()) {
+                                variables.push(tree::Variable::VarDeclaration(
+                                    name.clone(), 
+                                    Box::new(spec.to_owned()), 
+                                    size.clone()
+                                ));
+                                variables.push(tree::Variable::VarAssignment(
+                                    Box::new(tree::Variable::VarReference(name.clone(), Box::new(Vec::new()))),
+                                    value.clone()
+                                ));
+                            }
                         },
                         _ => {
                             let error = ErrorRecovery {
@@ -936,20 +944,8 @@ VarDef: Vec<tree::Variable> = {
                                 dropped_tokens: Vec::new(),
                             };
                             errors.push(error);
-                            "INVALID".to_string()
                         }
                     };
-                    if spec != tree::Value::Struct(str_.clone()) {
-                        variables.push(tree::Variable::VarDeclaration(
-                            Box::new(name.clone()), 
-                            Box::new(spec.to_owned()), 
-                            Box::new(Vec::new())
-                        ));
-                        variables.push(tree::Variable::VarAssignment(
-                            variable.clone(), 
-                            value.clone()
-                        ));
-                    }
                 },
                 _ => {}
             }
@@ -973,7 +969,13 @@ VarDec: tree::Variable = {
     <l:@L> <ident: Identifier> <size: DimDecs?> "=" <val:CompExpr> <r:@R> => {
         tree::Variable::VarAssignment(
             Box::new(tree::Variable::VarReference(Box::new(ident), Box::new(size.unwrap_or(Vec::new())))),
-            val,
+            Box::new(vec![*val]),
+        )
+    },
+    <ident: Identifier> <size: DimDecs?> "=" "{" <val: ArrayDecs> "}" => {
+        tree::Variable::VarAssignment(
+            Box::new(tree::Variable::VarReference(Box::new(ident), Box::new(size.unwrap_or(Vec::new())))),
+            Box::new(val.into_iter().map(|x| *x).collect()),
         )
     },
 
@@ -1012,11 +1014,12 @@ StructDec: tree::Variable = {
     "." <ident: Identifier> ":" <val: CompExpr> => {
         tree::Variable::VarAssignment(
             Box::new(tree::Variable::VarReference(Box::new(ident), Box::new(Vec::new()))),
-            val,
+            Box::new(vec![*val]),
         )
     },
     ! => { errors.push(<>); tree::Variable::Error },
 }
+
 
 pub CondExpr: Box<tree::CondExpr> = {
 #[precedence(level="1")]

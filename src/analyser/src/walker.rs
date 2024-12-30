@@ -271,8 +271,17 @@ impl Walker {
                     println!("VarAssignment: {:?}, Value: {:?}", var, val);
                 }
                 // Calculate the type of right hand side
-                let right_type = self.traverse_comp_expr(val)?;
-
+                let right_type = if val.len() == 1 {
+                    let first_element = val.first().unwrap();
+                    self.traverse_comp_expr(first_element)?
+                } else {
+                    self.errors.add_error(SemanticError::ImproperUsageError {
+                        id: 14,
+                        message: "Invalid Assignment.".to_owned(),
+                        line: 0
+                    });
+                    return None;
+                };
                 let left_type = self.traverse_variable(var)?;
 
                 match self.typer.check_assign_operation(left_type, right_type) {
