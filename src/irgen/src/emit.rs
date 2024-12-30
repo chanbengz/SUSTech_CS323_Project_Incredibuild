@@ -80,7 +80,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
     {
         match self {
             tree::Variable::VarAssignment(var, expr) => {
-                let val = expr.deref().emit(emitter).into_int_value();
+                let val = expr.deref().first()?.emit(emitter).into_int_value(); // TODO: Array assignment
                 match var.deref() {
                     tree::Variable::VarReference(name, _dims) => {
                         let ptr = *(emitter.get_var(name.deref()).unwrap().0);
@@ -110,12 +110,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
             }
             tree::Variable::VarDeclaration(name, ty, dims) => {
                 let ty = if dims.is_empty() {
-                    match (*ty).deref() {
-                        tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
-                        tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
-                        tree::Value::Pointer(_) => emitter.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
-                        _ => panic!("Type not supported"),
-                    }
+                    ty.deref().emit(emitter)?.get_type().into()
                 } else {
                     let dims = dims.deref().iter().rev().map(|dim|
                         dim.emit(emitter).into_int_value()).collect::<Vec<IntValue>>();
@@ -356,7 +351,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Expr {
                 let loop_info = emitter.loops.last().expect("Error in Continue");
                 emitter.builder.build_unconditional_branch(loop_info.loop_head).expect("Error in Continue");
             }
-            tree::Expr::Body(body, _ ){
+            tree::Expr::Body(body, _ ) => {
                 body.emit(emitter);
             }
             tree::Expr::Error => panic!("Error in Expr"),
@@ -566,6 +561,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Value {
             tree::Value::Char(c) => Some(emitter.context.i8_type().const_int(*c as u64, false).as_basic_value_enum()),
             tree::Value::Float(f) => Some(emitter.context.f32_type().const_float(*f as f64).as_basic_value_enum()),
             tree::Value::String(s) => Some(emitter.emit_global_string(&mut s.to_owned(), "").as_basic_value_enum()),
+            tree::Value::Pointer(_) => Some(emitter.context.ptr_type(AddressSpace::default()).const_null().as_basic_value_enum()),
             tree::Value::Null => None,
             _ => panic!("Error in Value"),
         }
