@@ -6,8 +6,6 @@ SPL(SUSTech Programming Language) Compiler in Rust
 
 </div>
 
-> [!WARNING]
-> This project is still on the fly.
 
 ## Features
 
@@ -15,7 +13,7 @@ SPL(SUSTech Programming Language) Compiler in Rust
     - [x] Lexer & Parser
     - [x] Semantic Analyser
     - [ ] Macro
-- [ ] LLVM IR Generation
+- [x] LLVM IR Generation
 - [ ] Optimization
     - [ ] SSA
 - [ ] Advanced
@@ -52,7 +50,7 @@ cc /path/to/output.S -o /path/to/output
 lli /path/to/output.ll
 ```
 
-> [!NOTE]
+> [!WARNING]
 > Some of the functionalities are weird in release mode.
 
 See `target/debug/incredibuild -h` for more options.
@@ -147,7 +145,7 @@ export LLVM_SYS_170_PREFIX=/opt/homebrew/Cellar/llvm/19.1.2 # pretend to be LLVM
 You can run test in each crate by using `cargo test` in the root folder. For example
 
 ```bash
-cd src/lexer
+cd src/lexer # or parser/analyser/irgen
 cargo test
 ```
 
