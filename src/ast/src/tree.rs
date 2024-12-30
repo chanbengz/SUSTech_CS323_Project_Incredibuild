@@ -25,7 +25,7 @@ pub enum Statement {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Variable {
     // VarAssignment allows only for VarReference and StructReference.
-    VarAssignment(Box<Variable>, Box<CompExpr>),
+    VarAssignment(Box<Variable>, Box<Vec<CompExpr>>),
 
     // Variable can be a single value or an array.
     // The last one is for the dimension list, if null than a value only.

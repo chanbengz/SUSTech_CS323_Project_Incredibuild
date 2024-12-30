@@ -223,6 +223,8 @@ mod tests {
         assert_parse(Parser::StmtParser, "int a[1];", "GlobalVariable: [Variable Declaration: a = [0: u32] with dimensions [1: u32]]");
         assert_parse(Parser::ProgramParser, "int main(){ int a; int *b = &a; int c = *b;}", 
         "Functions: Function: main:[Body: [Variable Declaration: a = [0: u32] with dimensions [], Variable Declaration: b = [Pointer(0: u32)] with dimensions []; Variable Assignment: b = (& a), Variable Declaration: c = [0: u32] with dimensions []; Variable Assignment: c = (* b)]]");
+        assert_parse(Parser::ProgramParser, "int main(){ int a[5][3]; a[5] = {0, 1, 2}; int b[5] = {1, 2, 3, 4, 5};}",
+        "Functions: Function: main:[Body: [Variable Declaration: a = [0: u32] with dimensions [5: u32, 3: u32], Variable Assignment: a[5: u32] = 0: u32, 1: u32, 2: u32, Variable Declaration: b = [0: u32] with dimensions [5: u32]; Variable Assignment: b = 1: u32, 2: u32, 3: u32, 4: u32, 5: u32]]");
     }
 
     #[test]

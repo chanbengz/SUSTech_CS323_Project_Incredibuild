@@ -44,8 +44,9 @@ impl fmt::Display for Variable {
                 dims.iter().map(|d| d.to_string()).collect::<Vec<String>>().join(", ")),
             Variable::VarReference(ident, dims) => write!(f, "{}{}", 
                 ident, dims.iter().map(|d| format!("[{}]", d)).collect::<Vec<String>>().join("][")),
-            Variable::VarAssignment(ident, expr) => write!(f, "Variable Assignment: {} = {}", 
-                ident, expr),
+            Variable::VarAssignment(ident, expr) => {
+                write!(f, "Variable Assignment: {} = {}", ident, expr.iter().map(|e| format!("{}", e)).collect::<Vec<String>>().join(", "))
+            },
             Variable::StructDefinition(ident, vars) => write!(f, "Struct Definition: {} with [{}]",
                 ident, 
                 vars.iter().map(|v| format!("{}", v)).collect::<Vec<String>>().join(", ")),
