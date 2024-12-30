@@ -92,12 +92,17 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
         target_machine.write_to_memory_buffer(&self.module, FileType::Assembly).unwrap()
     }
 
-    pub(crate) fn get_var(&self, name: &str) -> Option<(&PointerValue<'ctx>, &BasicTypeEnum<'ctx>)> {
+    pub(crate) fn get_var(&self, name: &str) -> Option<(PointerValue<'ctx>, BasicTypeEnum<'ctx>)> {
         for scope in self.scope.iter().rev() {
             if let Some((ptr, ty)) = scope.get(name) {
-                return Some((ptr, ty));
+                return Some((*ptr, *ty));
             }
         }
+        if let Some((ptr, ty)) = self.module.get_global(name)
+            .map(|gv| (gv.as_pointer_value(), gv.get_value_type().try_into().unwrap())) {
+            let (ptr, ty) = (ptr, ty);
+            return Some((ptr, ty));
+        };
         None
     }
 

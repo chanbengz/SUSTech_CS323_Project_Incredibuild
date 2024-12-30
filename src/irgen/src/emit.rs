@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::ops::Deref;
+use std::ops::{Add, Deref};
 use inkwell::AddressSpace;
 use inkwell::types::{BasicMetadataTypeEnum, BasicType};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, IntValue};
@@ -22,6 +22,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Program {
                 for part in parts {
                     part.emit(emitter);
                 }
+                None
             }
             tree::Program::Error => panic!("Error in Program"),
         }
@@ -41,26 +42,68 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::ProgramPart {
 }
 
 impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
-    type Output = ();
-    fn emit(&'ast self, _emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
+    type Output = Option<BasicValueEnum<'ctx>>;
+    fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
         where 'ast:'ctx
     {
         match self {
             tree::Statement::GlobalVariable(vars, ..) => {
                 for var in vars {
                     match var {
-                        // tree::Variable::VarAssignment(var, expr) => {
-                        //
-                        // },
-                        // tree::Variable::VarReference(name, dims) => {
-                        //
-                        // },
-                        // tree::Variable::VarDeclaration(name, ty, dims) => {
-                        //
-                        // },
-                        // tree::Variable::StructDefinition(_, _) => {}
-                        // tree::Variable::StructDeclaration(_, _, _) => {}
-                        // tree::Variable::StructReference(_) => {}
+                        tree::Variable::VarAssignment(var, expr) => {
+                            match var.as_ref() {
+                                tree::Variable::VarReference(name, dims) => {
+                                    let dims = dims.deref().iter().rev().map(|dim|
+                                        dim.emit(emitter).into_int_value()).collect::<Vec<IntValue>>();
+
+                                    let assign_vals = expr.as_ref().iter().map(|e| e.emit(emitter)).collect::<Vec<BasicValueEnum>>();
+                                    let global_variable = emitter.module.get_global(name.deref()).unwrap();
+                                    let (ptr, ty) = (global_variable.as_pointer_value(), global_variable.get_value_type().try_into().unwrap());
+                                    if dims.is_empty() {
+                                        return Some(emitter.builder.build_load(ty, ptr, name.deref()).unwrap().as_basic_value_enum());
+                                    } else {
+                                        let mut idx_vals = vec![emitter.context.i32_type().const_zero()];
+                                        idx_vals.extend(dims.deref().iter().map(|dim| dim.emit(emitter).into_int_value()));
+
+                                        unsafe {
+                                            emitter.builder.build_in_bounds_gep(
+                                                ty,
+                                                ptr,
+                                                idx_vals.as_ref(),
+                                                "index_access"
+                                            ).as_basic_value_enum()
+                                        }
+                                        emitter.builder.build_store(ptr, val).expect("");
+                                        for val in assign_vals {
+
+                                        }
+                                    }
+                                }
+                                _ => unimplemented!()
+                            }
+                        },
+                        tree::Variable::VarDeclaration(name, ty, dims) => {
+                            let dims = dims.deref().iter().rev().map(|dim|
+                                dim.emit(emitter).into_int_value()).collect::<Vec<IntValue>>();
+                            let typ = if dims.is_empty() {
+                                match (*ty).deref() {
+                                    tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
+                                    tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
+                                    tree::Value::Pointer(_) => emitter.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
+                                    _ => panic!("Type not supported"),
+                                }
+                            } else {
+                                dims.iter().fold(
+                                    emitter.context.i32_type().as_basic_type_enum(),
+                                    |acc, len| acc.array_type(len
+                                        .get_zero_extended_constant().unwrap() as u32)
+                                        .as_basic_type_enum()
+                                )
+                            };
+                            let global = emitter.module.add_global(typ, Some(AddressSpace::default()), name.deref());
+                            global.set_initializer(&typ.const_zero());
+                            None
+                        },
                         _ => unimplemented!()
                     }
                 }
@@ -80,10 +123,10 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
     {
         match self {
             tree::Variable::VarAssignment(var, expr) => {
-                let val = expr.deref().first()?.emit(emitter).into_int_value(); // TODO: Array assignment
+                let val = expr.deref().first()?.emit(emitter).into(); // TODO: Array assignment
                 match var.deref() {
                     tree::Variable::VarReference(name, _dims) => {
-                        let ptr = *(emitter.get_var(name.deref()).unwrap().0);
+                        let ptr = emitter.get_var(name.deref()).unwrap().0;
                         emitter.builder.build_store(ptr, val).expect("");
                     },
                     _ => panic!("Error in Variable"),
@@ -92,7 +135,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
             }
             tree::Variable::VarReference(name, dims) => {
                 let (ptr, ty) = emitter.get_var(name.deref()).unwrap();
-                let (ptr, ty) = (*ptr, *ty);
+                // let (ptr, ty) = (*ptr, *ty);
                 if dims.is_empty() {
                     Some(emitter.builder.build_load(ty, ptr, name.deref()).unwrap().as_basic_value_enum().into())
                 } else {
@@ -122,7 +165,6 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
                 };
                 let new_var = emitter.builder.build_alloca(ty, name.deref()).unwrap();
                 emitter.scope.last_mut().unwrap().insert(name.deref(), (new_var, ty));
-
                 None
             }
             tree::Variable::FormalParameter(_, ty, _) => ty.deref().emit(emitter),
@@ -386,7 +428,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
                     tree::UnaryOperator::Ref => {
                         let ptr = if let tree::Variable::VarReference(name, dims) = var {
                             let (ptr, ty) = emitter.get_var(name.deref()).unwrap();
-                            let (ptr, ty) = (*ptr, *ty);
+                            // let (ptr, ty) = (*ptr, *ty);
                             if dims.is_empty() {
                                 ptr
                             } else {
