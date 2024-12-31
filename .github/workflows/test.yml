@@ -41,4 +41,5 @@ jobs:
       working-directory: src/irgen
 
     - name: Test CodeGen
-      run: for file in test/phase4/*.spl; do cargo run -- $file; cc `echo $file | sed 's/\.spl/\.S/'` -o $file.out; done
+      run: for file in test/phase4/*.spl; do cargo run -- $file; cc `echo $file | sed 's/\.spl/\.S/'` -no-pie -o $file.out; done
+
