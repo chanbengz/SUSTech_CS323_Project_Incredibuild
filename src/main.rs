@@ -25,6 +25,10 @@ fn main() -> Result<(), String> {
     }
 
     let ast = parsed_input?;
+    if args.get_flag("debug") {
+        println!("{:#?}", ast);
+    }
+
     let mut walker = Walker::new(ast.clone(), &source_path, args.get_flag("debug"));
     walker.traverse();
     let errors = walker.print_errors();

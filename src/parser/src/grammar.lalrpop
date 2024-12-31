@@ -1045,7 +1045,6 @@ StructDec: tree::Variable = {
             Box::new(vec![*val]),
         )
     },
-    ! => { errors.push(<>); tree::Variable::Error },
 }
 
 

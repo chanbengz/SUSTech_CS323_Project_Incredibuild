@@ -29,7 +29,7 @@ entry:
   store i32 1, ptr %j, align 4
   br label %cond
 
-cond:                                             ; preds = %merge8, %entry
+cond:                                             ; preds = %merge6, %entry
   %j2 = load i32, ptr %j, align 4
   %number3 = load i32, ptr %number1, align 4
   %divtmp = udiv i32 %number3, 2
@@ -39,32 +39,30 @@ cond:                                             ; preds = %merge8, %entry
 body:                                             ; preds = %cond
   %number4 = load i32, ptr %number1, align 4
   %j5 = load i32, ptr %j, align 4
-  %number6 = load i32, ptr %number1, align 4
-  %j7 = load i32, ptr %j, align 4
-  %mod = call i32 @mod(i32 %number6, i32 %j7)
+  %mod = call i32 @mod(i32 %number4, i32 %j5)
   %eqtmp = icmp eq i32 %mod, 0
-  br i1 %eqtmp, label %then, label %merge8
+  br i1 %eqtmp, label %then, label %merge6
 
 merge:                                            ; preds = %cond
-  %sum13 = load i32, ptr %sum, align 4
-  %number14 = load i32, ptr %number1, align 4
-  %eqtmp15 = icmp eq i32 %sum13, %number14
-  br i1 %eqtmp15, label %then16, label %else
+  %sum11 = load i32, ptr %sum, align 4
+  %number12 = load i32, ptr %number1, align 4
+  %eqtmp13 = icmp eq i32 %sum11, %number12
+  br i1 %eqtmp13, label %then14, label %else
 
 then:                                             ; preds = %body
-  %sum9 = load i32, ptr %sum, align 4
-  %j10 = load i32, ptr %j, align 4
-  %addtmp = add i32 %sum9, %j10
+  %sum7 = load i32, ptr %sum, align 4
+  %j8 = load i32, ptr %j, align 4
+  %addtmp = add i32 %sum7, %j8
   store i32 %addtmp, ptr %sum, align 4
-  br label %merge8
+  br label %merge6
 
-merge8:                                           ; preds = %then, %body
-  %j11 = load i32, ptr %j, align 4
-  %addtmp12 = add i32 %j11, 1
-  store i32 %addtmp12, ptr %j, align 4
+merge6:                                           ; preds = %then, %body
+  %j9 = load i32, ptr %j, align 4
+  %addtmp10 = add i32 %j9, 1
+  store i32 %addtmp10, ptr %j, align 4
   br label %cond
 
-then16:                                           ; preds = %merge
+then14:                                           ; preds = %merge
   ret i32 1
 
 else:                                             ; preds = %merge
@@ -79,29 +77,28 @@ entry:
   store i32 1, ptr %i, align 4
   br label %cond
 
-cond:                                             ; preds = %merge4, %entry
+cond:                                             ; preds = %merge3, %entry
   %i1 = load i32, ptr %i, align 4
   %letmp = icmp sle i32 %i1, 100
   br i1 %letmp, label %body, label %merge
 
 body:                                             ; preds = %cond
   %i2 = load i32, ptr %i, align 4
-  %i3 = load i32, ptr %i, align 4
-  %isPerfectNumber = call i32 @isPerfectNumber(i32 %i3)
+  %isPerfectNumber = call i32 @isPerfectNumber(i32 %i2)
   %eqtmp = icmp eq i32 %isPerfectNumber, 1
-  br i1 %eqtmp, label %then, label %merge4
+  br i1 %eqtmp, label %then, label %merge3
 
 merge:                                            ; preds = %cond
   ret i32 0
 
 then:                                             ; preds = %body
-  %i5 = load i32, ptr %i, align 4
-  %0 = call i32 (ptr, ...) @printf(ptr @0, i32 %i5)
-  br label %merge4
+  %i4 = load i32, ptr %i, align 4
+  %0 = call i32 (ptr, ...) @printf(ptr @0, i32 %i4)
+  br label %merge3
 
-merge4:                                           ; preds = %then, %body
-  %i6 = load i32, ptr %i, align 4
-  %addtmp = add i32 %i6, 1
+merge3:                                           ; preds = %then, %body
+  %i5 = load i32, ptr %i, align 4
+  %addtmp = add i32 %i5, 1
   store i32 %addtmp, ptr %i, align 4
   br label %cond
 }

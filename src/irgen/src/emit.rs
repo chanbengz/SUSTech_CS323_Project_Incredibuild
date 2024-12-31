@@ -6,12 +6,7 @@ use inkwell::values::*;
 use crate::azuki::Loop;
 use spl_ast::tree;
 use crate::azuki::Azuki;
-use std::any::type_name;
 
-
-fn type_of<T>(_: &T) -> &'static str {
-    type_name::<T>()
-}
 
 pub trait Emit<'ast, 'ctx> {
     type Output;
@@ -82,7 +77,6 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
                                                 .map(|a| 
                                                     // emitter.context.i32_type().const_array(a.into_iter().map(|v| v.into_int_value()).collect::<Vec<IntValue>>().as_slice())
                                                     {
-                                                        println!("{:?}", type_of(&a));
                                                         match a[0] {
                                                             BasicValueEnum::IntValue(_) => emitter.context.i32_type().const_array(a.into_iter().map(|v| v.into_int_value()).collect::<Vec<IntValue>>().as_slice()),
                                                             BasicValueEnum::FloatValue(_) => emitter.context.f32_type().const_array(a.into_iter().map(|v| v.into_float_value()).collect::<Vec<FloatValue>>().as_slice()),
@@ -96,7 +90,6 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
 
                                             // If it is a multidimensional array
                                             for dim in dims {
-                                                println!("{:?}", dim);
                                                 let size = dim.get_zero_extended_constant().unwrap() as u32;
                                                 arrays = arrays
                                                     .chunks(size as usize)
@@ -357,7 +350,6 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Function {
                 }
 
                 let func = emitter.module.get_function((*name).as_str()).expect("Function undeclared");
-                let args = params.iter().map(|param| param.emit(emitter).into()).collect::<Vec<BasicMetadataValueEnum>>();
                 Some(emitter.builder.build_call(func, args.as_slice(), (*name).as_str()).unwrap()
                     .try_as_basic_value()
                     .left()
