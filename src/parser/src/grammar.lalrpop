@@ -833,19 +833,6 @@ VarManagement: tree::Expr = {
             }
         )
     },
-    <vl:@L> <s:StructRef> "=" <val:CompExpr> <vr:@R> => {
-        tree::Expr::VarManagement(
-            vec![tree::Variable::VarAssignment(
-                Box::new(tree::Variable::StructReference(Box::new(s))),
-                Box::new(vec![*val])
-            )],
-            Span {
-                source: source.to_string(),
-                start: vl,
-                end: vr
-            }
-        )
-    },
     <vl:@L> <lhs:Identifier> <dims:DimDecs?> "++" <vr:@R> => {
         let dims = match dims {
             Some(dims) => dims,
@@ -1001,10 +988,16 @@ VarDec: tree::Variable = {
             Box::new(dims.unwrap_or(Vec::new()))
         )
     },
-    <l:@L> <ident: Identifier> <size: DimDecs?> "=" <val:CompExpr> <r:@R> => {
+    <ident: Identifier> <size: DimDecs?> "=" <val:CompExpr> => {
         tree::Variable::VarAssignment(
             Box::new(tree::Variable::VarReference(Box::new(ident), Box::new(size.unwrap_or(Vec::new())))),
             Box::new(vec![*val]),
+        )
+    },
+    <s:StructRef> "=" <val:CompExpr> => {
+        tree::Variable::VarAssignment(
+            Box::new(tree::Variable::StructReference(Box::new(s))),
+            Box::new(vec![*val])
         )
     },
     <ident: Identifier> <size: DimDecs?> "=" "{" <val: ArrayDecs> "}" => {

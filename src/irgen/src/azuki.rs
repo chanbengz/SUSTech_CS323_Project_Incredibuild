@@ -1,6 +1,5 @@
 use inkwell as llvm;
 use std::collections::HashMap;
-// use std::hash::Hash;
 use inkwell::AddressSpace;
 use inkwell::memory_buffer::MemoryBuffer;
 use inkwell::module::Linkage;
