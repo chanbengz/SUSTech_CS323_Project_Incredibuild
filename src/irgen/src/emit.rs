@@ -2,10 +2,16 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use inkwell::AddressSpace;
 use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
-use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, IntValue, ArrayValue};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, IntValue, FloatValue, ArrayValue};
 use crate::azuki::Loop;
 use spl_ast::tree;
 use crate::azuki::Azuki;
+
+use std::any::type_name;
+
+fn type_of<T>(_: &T) -> &'static str {
+    type_name::<T>()
+}
 
 pub trait Emit<'ast, 'ctx> {
     type Output;
@@ -60,12 +66,17 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
                                         match (*ty).deref() {
                                             tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
                                             tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
-                                            tree::Value::Pointer(_) => emitter.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
+                                            tree::Value::Char(_) => emitter.context.i8_type().as_basic_type_enum(),
                                             _ => panic!("Type not supported"),
                                         }
                                     } else {
                                         dims.iter().fold(
-                                            emitter.context.i32_type().as_basic_type_enum(),
+                                            match ty.deref() {
+                                                tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
+                                                tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
+                                                tree::Value::Char(_) => emitter.context.i8_type().as_basic_type_enum(),
+                                                _ => panic!("Type not supported"),
+                                            },
                                             |acc, len| acc.array_type(len.get_zero_extended_constant().unwrap() as u32)
                                                 .as_basic_type_enum()
                                         )
@@ -80,7 +91,17 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
 
                                             let mut arrays = assign_vals
                                                 .chunks(top_size as usize)
-                                                .map(|a| emitter.context.i32_type().const_array(a.into_iter().map(|v| v.into_int_value()).collect::<Vec<IntValue>>().as_slice()))
+                                                .map(|a| 
+                                                    // emitter.context.i32_type().const_array(a.into_iter().map(|v| v.into_int_value()).collect::<Vec<IntValue>>().as_slice())
+                                                    {
+                                                        println!("{:?}", type_of(&a));
+                                                        match a[0] {
+                                                            BasicValueEnum::IntValue(_) => emitter.context.i32_type().const_array(a.into_iter().map(|v| v.into_int_value()).collect::<Vec<IntValue>>().as_slice()),
+                                                            BasicValueEnum::FloatValue(_) => emitter.context.f32_type().const_array(a.into_iter().map(|v| v.into_float_value()).collect::<Vec<FloatValue>>().as_slice()),
+                                                            _ => panic!("Not support type of array")
+                                                        }
+                                                    }
+                                                )
                                                 .collect::<Vec<ArrayValue>>();
 
                                             let mut typ_t = emitter.context.i32_type().array_type(top_size);
@@ -99,11 +120,15 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
                                             let global = emitter.module.add_global(typ_t, Some(AddressSpace::default()), name.deref());
                                             global.set_initializer(&arrays.as_slice()[0]);
                                         },
-                                        BasicTypeEnum::PointerType(_) => {
-                                            unimplemented!()
+                                        BasicTypeEnum::IntType(_) => {
+                                            let val = expr.deref().first().unwrap().emit(emitter).into_int_value();
+                                            let global = emitter.module.add_global(typ, None, name.deref());
+                                            global.set_initializer(&val);
                                         },
-                                        BasicTypeEnum::StructType(_) => {
-                                            unimplemented!()
+                                        BasicTypeEnum::FloatType(_) => {
+                                            let val = expr.deref().first().unwrap().emit(emitter).into_float_value();
+                                            let global = emitter.module.add_global(typ, None, name.deref());
+                                            global.set_initializer(&val);
                                         },
                                         _ => {
                                             unimplemented!()
@@ -125,7 +150,12 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
                                 }
                             } else {
                                 dims.iter().fold(
-                                    emitter.context.i32_type().as_basic_type_enum(),
+                                    match ty.deref() {
+                                        tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
+                                        tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
+                                        tree::Value::Char(_) => emitter.context.i8_type().as_basic_type_enum(),
+                                        _ => panic!("Type not supported"),
+                                    },
                                     |acc, len| acc.array_type(len
                                         .get_zero_extended_constant().unwrap() as u32)
                                         .as_basic_type_enum()
@@ -138,9 +168,50 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
                     }
                 }
             }
-            // tree::Statement::Struct(def, _) => {
-            //
-            // },
+            tree::Statement::Struct(def, _) => {
+                match def {
+                    tree::Variable::StructDefinition(name, vars) => {
+                        let mut field_hashmap = HashMap::new();
+                        let mut struct_types = vec![];
+                        for (i, var) in vars.iter().enumerate() {
+                            match var {
+                                tree::Variable::VarDeclaration(field_name, ty, dims) => {
+                                    let ty = if dims.is_empty() {
+                                        match ty.deref() {
+                                            tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
+                                            tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
+                                            tree::Value::Char(_) => emitter.context.i8_type().as_basic_type_enum(),
+                                            _ => panic!("Type not supported"),
+                                        }
+                                    } else {
+                                        let dims = dims.deref().iter().rev().map(|dim|
+                                            dim.emit(emitter).into_int_value()).collect::<Vec<IntValue>>();
+                                        dims.iter().fold(
+                                            match ty.deref() {
+                                                tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
+                                                tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
+                                                tree::Value::Char(_) => emitter.context.i8_type().as_basic_type_enum(),
+                                                _ => panic!("Type not supported"),
+                                            },
+                                            |acc, len| acc.array_type(len.get_zero_extended_constant().unwrap() as u32)
+                                                .as_basic_type_enum()
+                                        )
+                                    };
+                                    field_hashmap.insert(field_name.deref().as_str(), i);
+                                    struct_types.push(ty);
+                                },
+                                _ => unimplemented!()
+                            }
+                        }
+                        emitter.struct_fields.insert(name.deref(), field_hashmap);
+                        let struct_type = emitter.context.struct_type(struct_types.as_slice(), false);
+
+                        let global_var = emitter.module.add_global(struct_type, None, name.deref());
+                        global_var.set_initializer(&struct_type.const_zero());
+                    },
+                    _ => unimplemented!()
+                }
+            },
             _ => panic!("Error in Statement"),
         }
     }

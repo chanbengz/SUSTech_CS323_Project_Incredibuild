@@ -112,12 +112,12 @@ mod tests {
 
     #[test]
     fn test_global_variable() {
-        let source = "int a[2][3] = {0, 1, 2, 3, 4, 2}; int main() { printf(\"%d\\n\", a[1][0]); return 0; }";
+        let source = "int a[2][3] = {0, 1, 2, 3, 4, 2}; struct Fruit {int weight; float cost[3];}; int main() { printf(\"%d\\n\", a[1][0]); return 0; }";
         let ast = spl_parser::parse(source).unwrap();
         let ir = emit_llvmir("test_global_variable.spl", ast.clone());
         // emit_llvmir_to_file("test_global.spl", ast, "test_global.ll");
         assert_eq!(ir, 
-            "; ModuleID = 'test_global_variable.spl'\nsource_filename = \"test_global_variable.spl\"\n\n@a = global [2 x [3 x i32]] [[3 x i32] [i32 0, i32 1, i32 2], [3 x i32] [i32 3, i32 4, i32 2]]\n@0 = internal global [4 x i8] c\"%d\\0A\\00\"\n\ndefine i32 @main() {\nentry:\n  %a = load [2 x [3 x i32]], ptr getelementptr inbounds ([2 x [3 x i32]], ptr @a, i32 0, i32 1, i32 0), align 4\n  %0 = call i32 (ptr, ...) @printf(ptr @0, [2 x [3 x i32]] %a)\n  ret i32 0\n}\n\ndeclare i32 @printf(ptr, ...)\n");
+            "; ModuleID = 'test_global_variable.spl'\nsource_filename = \"test_global_variable.spl\"\n\n@a = global [2 x [3 x i32]] [[3 x i32] [i32 0, i32 1, i32 2], [3 x i32] [i32 3, i32 4, i32 2]]\n@Fruit = global { i32, [3 x float] } zeroinitializer\n@0 = internal global [4 x i8] c\"%d\\0A\\00\"\n\ndefine i32 @main() {\nentry:\n  %a = load [2 x [3 x i32]], ptr getelementptr inbounds ([2 x [3 x i32]], ptr @a, i32 0, i32 1, i32 0), align 4\n  %0 = call i32 (ptr, ...) @printf(ptr @0, [2 x [3 x i32]] %a)\n  ret i32 0\n}\n\ndeclare i32 @printf(ptr, ...)\n");
     }
 
     #[test]

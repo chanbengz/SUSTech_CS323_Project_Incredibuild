@@ -1,5 +1,6 @@
 use inkwell as llvm;
 use std::collections::HashMap;
+// use std::hash::Hash;
 use inkwell::AddressSpace;
 use inkwell::memory_buffer::MemoryBuffer;
 use inkwell::module::Linkage;
@@ -15,6 +16,7 @@ pub(crate) struct Azuki<'ast, 'ctx> {
 
     pub scope: Vec<HashMap<&'ast str, (PointerValue<'ctx>, BasicTypeEnum<'ctx>)>>,
     pub loops: Vec<Loop<'ctx>>,
+    pub struct_fields: HashMap<&'ast str, HashMap<&'ast str, usize>>,
     printf: Option<llvm::values::FunctionValue<'ctx>>,
     scanf: Option<llvm::values::FunctionValue<'ctx>>,
 }
@@ -29,6 +31,7 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
             module,
             scope: vec![HashMap::new()],
             loops: Vec::new(),
+            struct_fields: HashMap::new(),
             printf: None,
             scanf: None,
         }
