@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use spl_lexer::tokens::Span;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -157,4 +158,19 @@ pub enum Expr{
     Continue(Span),
     Return(CompExpr, Span),
     Error
+}
+
+impl Variable {
+    pub fn get_name(&self) -> String {
+        match self {
+            Variable::VarAssignment(var, _) => var.deref().get_name(),
+            Variable::VarReference(name, _) => name.deref().clone(),
+            Variable::VarDeclaration(name, _, _) => name.deref().clone(),
+            Variable::StructDefinition(name, _) => name.deref().clone(),
+            Variable::StructDeclaration(name, _, _) => name.deref().clone(),
+            Variable::StructReference(vars) => vars.deref().iter().map(|v| v.get_name()).collect::<Vec<String>>().join("."),
+            Variable::FormalParameter(name, _, _) => name.deref().clone(),
+            Variable::Error => "Error".to_string()
+        }
+    }
 }

@@ -122,15 +122,24 @@ mod tests {
 
     #[test]
     fn test_struct_decl() {
-        let source = "struct Fruit {int weight; float cost[3];}; int main() { struct Fruit apple; printf(\"%d\\n\", apple.weight); return 0; }";
+        let source = "struct Fruit {int weight; float cost[3];}; int main() { struct Fruit apple; apple.weight = 100; printf(\"%d\\n\", apple.weight); return 0; }";
         let ast = spl_parser::parse(source).unwrap();
         let ir = emit_llvmir("test_struct_decl.spl", ast.clone());
-        assert_eq!(ir, "; ModuleID = 'test_struct_decl.spl'\nsource_filename = \"test_struct_decl.spl\"\n\n%Fruit = type { i32, [3 x float] }\n\n@0 = internal global [4 x i8] c\"%d\\0A\\00\"\n\ndefine i32 @main() {\nentry:\n  %apple = alloca %Fruit, align 8\n  %weight = getelementptr inbounds %Fruit, ptr %apple, i32 0, i32 0\n  %weight1 = load i32, ptr %weight, align 4\n  %0 = call i32 (ptr, ...) @printf(ptr @0, i32 %weight1)\n  ret i32 0\n}\n\ndeclare i32 @printf(ptr, ...)\n");
+        assert_eq!(ir, "; ModuleID = 'test_struct_decl.spl'\nsource_filename = \"test_struct_decl.spl\"\n\n%Fruit = type { i32, [3 x float] }\n\n@0 = internal global [4 x i8] c\"%d\\0A\\00\"\n\ndefine i32 @main() {\nentry:\n  %apple = alloca %Fruit, align 8\n  %weight = getelementptr inbounds %Fruit, ptr %apple, i32 0, i32 0\n  store i32 100, ptr %weight, align 4\n  %weight1 = getelementptr inbounds %Fruit, ptr %apple, i32 0, i32 0\n  %apple.weight = load i32, ptr %weight1, align 4\n  %0 = call i32 (ptr, ...) @printf(ptr @0, i32 %apple.weight)\n  ret i32 0\n}\n\ndeclare i32 @printf(ptr, ...)\n");
     }
 
     #[test]
     fn gen_test_r00() {
         test_from_file("../../test/test_0_r00.spl", "../../test/test_0_r00.ll", true);
+    }
+
+    #[test]
+    fn test_self_define() {
+        for i in 1..=1 {
+            let source_path = format!("../../test/phase3/self_def_s{:02}.spl", i);
+            let expected_path = format!("../../test/phase3/self_def_s{:02}.ll", i);
+            test_from_file(&source_path, &expected_path, true);
+        }
     }
 
     #[test]

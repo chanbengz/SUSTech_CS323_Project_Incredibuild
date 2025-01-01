@@ -5,7 +5,7 @@ use spl_lexer::tokens::{Token, LexicalError};
 lalrpop_mod!(pub grammar); // synthesized by LALRPOP
 use spl_ast::tree;
 pub use crate::error::emit_error;
-use crate::grammar::ProgramParser;
+use crate::grammar::*;
 
 pub mod error;
 use std::io::Read;

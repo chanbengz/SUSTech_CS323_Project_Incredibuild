@@ -823,9 +823,9 @@ VarManagement: tree::Expr = {
             }
         )
     },
-    <vl:@L> <def: VarDec> <vr:@R> => {
+    <vl:@L> <dec: VarDecs> <vr:@R> => {
         tree::Expr::VarManagement(
-            vec![def],
+            dec,
             Span {
                 source: source.to_string(),
                 start: vl,
