@@ -154,9 +154,23 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
     {
         match self {
             tree::Variable::VarAssignment(var, expr) => {
-                let val: BasicValueEnum = expr.deref().first()?.emit(emitter).into();
-                let ptr = var.emit(emitter).unwrap().into_pointer_value();
-                emitter.builder.build_store(ptr, val).expect("Store failed");
+                if expr.deref().len() == 1 {
+                    let val: BasicValueEnum = expr.deref().first()?.emit(emitter).into();
+                    let ptr_t = var.emit(emitter).unwrap().into_pointer_value();
+                    emitter.builder.build_store(ptr_t, val).expect("Store failed");
+                } else {
+                    let ptr = var.emit(emitter).unwrap().into_pointer_value();
+                    let assign_vals = expr.deref().iter().map(|expr| expr.emit(emitter)).collect::<Vec<BasicValueEnum>>();
+
+                    for (i, val) in assign_vals.iter().enumerate() {
+                        let idx_vals = vec![emitter.context.i32_type().const_zero(), emitter.context.i32_type().const_int(i as u64, false)];
+                        let array_type = emitter.context.i32_type().as_basic_type_enum().array_type(assign_vals.len() as u32).as_basic_type_enum();
+                        let ptr_t = unsafe {
+                            emitter.builder.build_gep(array_type, ptr, idx_vals.as_slice(), "index").unwrap()
+                        };
+                        emitter.builder.build_store(ptr_t, *val).expect("Store failed");
+                    }
+                }
                 None
             }
             tree::Variable::VarReference(name, dims) => {
@@ -495,7 +509,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
             tree::CompExpr::Value(val) => val.emit(emitter).unwrap(),
             tree::CompExpr::Variable(var) => {
                 let ptr = var.emit(emitter).unwrap();
-                let ty = emitter.get_var_type(&var.get_name()).unwrap();
+                let ty: BasicTypeEnum<'ctx> = emitter.get_var_type(&var.get_name()).unwrap();
                 emitter.builder.build_load(ty, ptr.into_pointer_value(), &var.get_name()).unwrap().as_basic_value_enum()
             },
             tree::CompExpr::FuncCall(function) => {
@@ -529,7 +543,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
                                 emitter.builder.build_int_add(lhs, rhs.into_int_value(), "addtmp").unwrap().as_basic_value_enum(),
                             BasicValueEnum::FloatValue(lhs) =>
                                 emitter.builder.build_float_add(lhs, rhs.into_float_value(), "addtmp").unwrap().as_basic_value_enum(),
-                            _ => panic!("Error in CompExpr"),
+                            _ => panic!("Error in CompExpr Add"),
                         }
                     }
                     tree::BinaryOperator::Sub => {
@@ -538,7 +552,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
                                 emitter.builder.build_int_sub(lhs, rhs.into_int_value(), "subtmp").unwrap().as_basic_value_enum(),
                             BasicValueEnum::FloatValue(lhs) =>
                                 emitter.builder.build_float_sub(lhs, rhs.into_float_value(), "subtmp").unwrap().as_basic_value_enum(),
-                            _ => panic!("Error in CompExpr"),
+                            _ => panic!("Error in CompExpr Sub"),
                         }
                     }
                     tree::BinaryOperator::Mul => {
@@ -547,7 +561,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
                                 emitter.builder.build_int_mul(lhs, rhs.into_int_value(), "multmp").unwrap().as_basic_value_enum(),
                             BasicValueEnum::FloatValue(lhs) =>
                                 emitter.builder.build_float_mul(lhs, rhs.into_float_value(), "multmp").unwrap().as_basic_value_enum(),
-                            _ => panic!("Error in CompExpr"),
+                            _ => panic!("Error in CompExpr Mul"),
                         }
                     }
                     tree::BinaryOperator::Div => {
@@ -556,7 +570,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
                                 emitter.builder.build_int_unsigned_div(lhs, rhs.into_int_value(), "divtmp").unwrap().as_basic_value_enum(),
                             BasicValueEnum::FloatValue(lhs) =>
                                 emitter.builder.build_float_div(lhs, rhs.into_float_value(), "divtmp").unwrap().as_basic_value_enum(),
-                            _ => panic!("Error in CompExpr"),
+                            _ => panic!("Error in CompExpr Div"),
                         }
                     }
                     tree::BinaryOperator::Mod => {
@@ -565,33 +579,33 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
                                 emitter.builder.build_int_signed_rem(lhs, rhs.into_int_value(), "modtmp").unwrap().as_basic_value_enum(),
                             BasicValueEnum::FloatValue(lhs) =>
                                 emitter.builder.build_float_rem(lhs, rhs.into_float_value(), "modtmp").unwrap().as_basic_value_enum(),
-                            _ => panic!("Error in CompExpr"),
+                            _ => panic!("Error in CompExpr Mod"),
                         }
                     }
                     tree::BinaryOperator::BitwiseAnd => {
                         match lhs {
                             BasicValueEnum::IntValue(lhs) =>
                                 emitter.builder.build_and(lhs, rhs.into_int_value(), "andtmp").unwrap().as_basic_value_enum(),
-                            _ => panic!("Error in CompExpr"),
+                            _ => panic!("Error in CompExpr &"),
                         }
                     }
                     tree::BinaryOperator::BitwiseOr => {
                         match lhs {
                             BasicValueEnum::IntValue(lhs) =>
                                 emitter.builder.build_or(lhs, rhs.into_int_value(), "ortmp").unwrap().as_basic_value_enum(),
-                            _ => panic!("Error in CompExpr"),
+                            _ => panic!("Error in CompExpr |"),
                         }
                     }
                     tree::BinaryOperator::BitwiseXor => {
                         match lhs {
                             BasicValueEnum::IntValue(lhs) =>
                                 emitter.builder.build_xor(lhs, rhs.into_int_value(), "xortmp").unwrap().as_basic_value_enum(),
-                            _ => panic!("Error in CompExpr"),
+                            _ => panic!("Error in CompExpr ^"),
                         }
                     }
-                _ => panic!("Error in CompExpr"),
+                _ => panic!("Error in CompExpr BinaryOperation"),
             }}
-            _ => panic!("Error in CompExpr"),
+            _ => panic!("Error in CompExpr Unsupported"),
         }
     }
 }

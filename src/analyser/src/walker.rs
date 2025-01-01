@@ -265,25 +265,42 @@ impl Walker {
                     }
                 }
             }
-            
             Variable::VarAssignment(var, val) => {
                 if self.verbose {
                     println!("VarAssignment: {:?}, Value: {:?}", var, val);
                 }
                 // Calculate the type of right hand side
+                let left_type = self.traverse_variable(var)?;
+                let dims = match left_type {
+                    VarType::Array((_, ref d)) => d.clone(),
+                    _ => Vec::new()
+                };
+
                 let right_type = if val.len() == 1 {
                     let first_element = val.first().unwrap();
                     self.traverse_comp_expr(first_element)?
                 } else {
-                    self.errors.add_error(SemanticError::ImproperUsageError {
-                        id: 14,
-                        message: "Invalid Assignment.".to_owned(),
-                        line: 0
-                    });
-                    return None;
+                    let array_type = self.traverse_comp_expr(val.first().unwrap()).unwrap();
+                    let assigned_values = val.iter().map(|v| {
+                        let var_type = self.traverse_comp_expr(v).unwrap();
+                        self.typer.check_assign_operation(array_type.clone(), var_type).unwrap()
+                    }).collect::<Vec<VarType>>();
+                    let basic_type = match array_type {
+                        VarType::Primitive(b) => b,
+                        _ => BasicType::Null
+                    };
+                    if assigned_values.len() != dims.iter().product() {
+                        self.errors.add_error(SemanticError::ImproperUsageError {
+                            id: 14,
+                            message: "Invalid Array Assignment.".to_owned(),
+                            line: 0
+                        });
+                        return None;
+                    }
+                    let array_type = VarType::Array((basic_type, dims));
+                    array_type
                 };
-                let left_type = self.traverse_variable(var)?;
-
+                
                 match self.typer.check_assign_operation(left_type, right_type) {
                     Ok(t) => Some(t),
                     Err(err) => {
@@ -775,6 +792,7 @@ impl Walker {
                             VarType::Primitive(BasicType::Int) => Some(VarType::Primitive(BasicType::Pointer(Box::new(BasicType::Int)))),
                             VarType::Primitive(BasicType::Float) => Some(VarType::Primitive(BasicType::Pointer(Box::new(BasicType::Float)))),
                             VarType::Primitive(BasicType::Char) => Some(VarType::Primitive(BasicType::Pointer(Box::new(BasicType::Char)))),
+                            VarType::Array((t, _)) => Some(VarType::Primitive(BasicType::Pointer(Box::new(t)))),
                             _ => {
                                 self.errors.add_error(SemanticError::ImproperUsageError {
                                     id: 11,
