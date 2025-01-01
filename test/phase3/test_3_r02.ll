@@ -76,12 +76,10 @@ entry:
   %0 = call i32 (ptr, ...) @scanf(ptr @0, ptr %r, ptr %c)
   %r1 = load i32, ptr %r, align 4
   %c2 = load i32, ptr %c, align 4
-  %r3 = load i32, ptr %r, align 4
-  %c4 = load i32, ptr %c, align 4
-  %calculateBinomialCoefficient = call i32 @calculateBinomialCoefficient(i32 %r3, i32 %c4)
+  %calculateBinomialCoefficient = call i32 @calculateBinomialCoefficient(i32 %r1, i32 %c2)
   store i32 %calculateBinomialCoefficient, ptr %coe, align 4
-  %coe5 = load i32, ptr %coe, align 4
-  %1 = call i32 (ptr, ...) @printf(ptr @1, i32 %coe5)
+  %coe3 = load i32, ptr %coe, align 4
+  %1 = call i32 (ptr, ...) @printf(ptr @1, i32 %coe3)
   ret i32 0
 }
 

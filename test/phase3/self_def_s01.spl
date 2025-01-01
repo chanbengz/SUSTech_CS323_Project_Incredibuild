@@ -1,0 +1,16 @@
+struct Point {
+    int x, y;
+};
+
+int main() {
+    struct Point a;
+    a.x = 1, a.y = 2;
+    struct Point b = {
+        .x : 3,
+        .y : 4
+    };
+    printf("a = (%d, %d)\n", a.x, a.y);
+    printf("b = (%d, %d)\n", b.x, b.y);
+
+    return 0;
+}

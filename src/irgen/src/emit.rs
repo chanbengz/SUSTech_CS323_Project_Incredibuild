@@ -2,16 +2,11 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use inkwell::AddressSpace;
 use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
-use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, IntValue, FloatValue, ArrayValue};
+use inkwell::values::*;
 use crate::azuki::Loop;
 use spl_ast::tree;
 use crate::azuki::Azuki;
 
-use std::any::type_name;
-
-fn type_of<T>(_: &T) -> &'static str {
-    type_name::<T>()
-}
 
 pub trait Emit<'ast, 'ctx> {
     type Output;
@@ -59,29 +54,17 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
                             match var.as_ref() {
                                 tree::Variable::VarDeclaration(name, ty, dims) => {
                                     // Dimensions reference
-                                    let dims = dims.deref().iter().rev().map(|dim|
-                                        dim.emit(emitter).into_int_value()).collect::<Vec<IntValue>>();
-
-                                    let typ = if dims.is_empty() {
-                                        match (*ty).deref() {
-                                            tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
-                                            tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
-                                            tree::Value::Char(_) => emitter.context.i8_type().as_basic_type_enum(),
-                                            _ => panic!("Type not supported"),
-                                        }
+                                    let dims = get_array_dims(dims, emitter);
+                                    let ty = if dims.is_empty() {
+                                        ty.deref().emit(emitter).unwrap().get_type().as_basic_type_enum()
                                     } else {
                                         dims.iter().fold(
-                                            match ty.deref() {
-                                                tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
-                                                tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
-                                                tree::Value::Char(_) => emitter.context.i8_type().as_basic_type_enum(),
-                                                _ => panic!("Type not supported"),
-                                            },
+                                            ty.deref().emit(emitter).unwrap().get_type().as_basic_type_enum(),
                                             |acc, len| acc.array_type(len.get_zero_extended_constant().unwrap() as u32)
                                                 .as_basic_type_enum()
                                         )
                                     };
-                                    match typ {
+                                    match ty {
                                         BasicTypeEnum::ArrayType(_) => {
                                             // Get the array values
                                             let assign_vals = expr.deref().iter().map(|expr| expr.emit(emitter)).collect::<Vec<BasicValueEnum>>();
@@ -94,7 +77,6 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
                                                 .map(|a| 
                                                     // emitter.context.i32_type().const_array(a.into_iter().map(|v| v.into_int_value()).collect::<Vec<IntValue>>().as_slice())
                                                     {
-                                                        println!("{:?}", type_of(&a));
                                                         match a[0] {
                                                             BasicValueEnum::IntValue(_) => emitter.context.i32_type().const_array(a.into_iter().map(|v| v.into_int_value()).collect::<Vec<IntValue>>().as_slice()),
                                                             BasicValueEnum::FloatValue(_) => emitter.context.f32_type().const_array(a.into_iter().map(|v| v.into_float_value()).collect::<Vec<FloatValue>>().as_slice()),
@@ -104,30 +86,29 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
                                                 )
                                                 .collect::<Vec<ArrayValue>>();
 
-                                            let mut typ_t = emitter.context.i32_type().array_type(top_size);
+                                            let mut array_ty = emitter.context.i32_type().array_type(top_size);
 
                                             // If it is a multidimensional array
                                             for dim in dims {
-                                                println!("{:?}", dim);
                                                 let size = dim.get_zero_extended_constant().unwrap() as u32;
                                                 arrays = arrays
                                                     .chunks(size as usize)
-                                                    .map(|a| typ_t.const_array(a))
+                                                    .map(|a| array_ty.const_array(a))
                                                     .collect::<Vec<ArrayValue>>();
-                                                typ_t = typ_t.array_type(size);
+                                                array_ty = array_ty.array_type(size);
                                             }
                                             // Get the global variable and its pointer and its type (ArrayType if it is an array)
-                                            let global = emitter.module.add_global(typ_t, Some(AddressSpace::default()), name.deref());
+                                            let global = emitter.module.add_global(array_ty, Some(AddressSpace::default()), name.deref());
                                             global.set_initializer(&arrays.as_slice()[0]);
                                         },
                                         BasicTypeEnum::IntType(_) => {
                                             let val = expr.deref().first().unwrap().emit(emitter).into_int_value();
-                                            let global = emitter.module.add_global(typ, None, name.deref());
+                                            let global = emitter.module.add_global(ty, None, name.deref());
                                             global.set_initializer(&val);
                                         },
                                         BasicTypeEnum::FloatType(_) => {
                                             let val = expr.deref().first().unwrap().emit(emitter).into_float_value();
-                                            let global = emitter.module.add_global(typ, None, name.deref());
+                                            let global = emitter.module.add_global(ty, None, name.deref());
                                             global.set_initializer(&val);
                                         },
                                         _ => {
@@ -139,84 +120,33 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
                             }
                         },
                         tree::Variable::VarDeclaration(name, ty, dims) => {
-                            let dims = dims.deref().iter().rev().map(|dim|
-                                dim.emit(emitter).into_int_value()).collect::<Vec<IntValue>>();
-                            let typ = if dims.is_empty() {
-                                match (*ty).deref() {
-                                    tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
-                                    tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
-                                    tree::Value::Pointer(_) => emitter.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
-                                    _ => panic!("Type not supported"),
-                                }
+                            let dims = get_array_dims(dims, emitter);
+                            let ty = if dims.is_empty() {
+                                ty.deref().emit(emitter).unwrap().get_type().as_basic_type_enum()
                             } else {
                                 dims.iter().fold(
-                                    match ty.deref() {
-                                        tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
-                                        tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
-                                        tree::Value::Char(_) => emitter.context.i8_type().as_basic_type_enum(),
-                                        _ => panic!("Type not supported"),
-                                    },
+                                    ty.deref().emit(emitter).unwrap().get_type().as_basic_type_enum(),
                                     |acc, len| acc.array_type(len
                                         .get_zero_extended_constant().unwrap() as u32)
                                         .as_basic_type_enum()
                                 )
                             };
-                            let global = emitter.module.add_global(typ, None, name.deref());
-                            global.set_initializer(&typ.const_zero());
+                            let global = emitter.module.add_global(ty, None, name.deref());
+                            global.set_initializer(&ty.const_zero());
                         },
                         _ => unimplemented!()
                     }
                 }
             }
             tree::Statement::Struct(def, _) => {
-                match def {
-                    tree::Variable::StructDefinition(name, vars) => {
-                        let mut field_hashmap = HashMap::new();
-                        let mut struct_types = vec![];
-                        for (i, var) in vars.iter().enumerate() {
-                            match var {
-                                tree::Variable::VarDeclaration(field_name, ty, dims) => {
-                                    let ty = if dims.is_empty() {
-                                        match ty.deref() {
-                                            tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
-                                            tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
-                                            tree::Value::Char(_) => emitter.context.i8_type().as_basic_type_enum(),
-                                            _ => panic!("Type not supported"),
-                                        }
-                                    } else {
-                                        let dims = dims.deref().iter().rev().map(|dim|
-                                            dim.emit(emitter).into_int_value()).collect::<Vec<IntValue>>();
-                                        dims.iter().fold(
-                                            match ty.deref() {
-                                                tree::Value::Integer(_) => emitter.context.i32_type().as_basic_type_enum(),
-                                                tree::Value::Float(_) => emitter.context.f32_type().as_basic_type_enum(),
-                                                tree::Value::Char(_) => emitter.context.i8_type().as_basic_type_enum(),
-                                                _ => panic!("Type not supported"),
-                                            },
-                                            |acc, len| acc.array_type(len.get_zero_extended_constant().unwrap() as u32)
-                                                .as_basic_type_enum()
-                                        )
-                                    };
-                                    field_hashmap.insert(field_name.deref().as_str(), i);
-                                    struct_types.push(ty);
-                                },
-                                _ => unimplemented!()
-                            }
-                        }
-                        emitter.struct_fields.insert(name.deref(), field_hashmap);
-                        let struct_type = emitter.context.struct_type(struct_types.as_slice(), false);
-
-                        let global_var = emitter.module.add_global(struct_type, None, name.deref());
-                        global_var.set_initializer(&struct_type.const_zero());
-                    },
-                    _ => unimplemented!()
-                }
+                def.emit(emitter);
             },
             _ => panic!("Error in Statement"),
         }
     }
 }
 
+// Variable operations inside function bodies
 impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
     type Output = Option<BasicValueEnum<'ctx>>;
     fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
@@ -224,39 +154,28 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
     {
         match self {
             tree::Variable::VarAssignment(var, expr) => {
-                let val: BasicValueEnum = expr.deref().first()?.emit(emitter).into(); // TODO: Array assignment
-                match var.deref() {
-                    tree::Variable::VarReference(name, _dims) => {
-                        let ptr = emitter.get_var(name.deref()).unwrap().0;
-                        emitter.builder.build_store(ptr, val).expect("");
-                    },
-                    _ => panic!("Error in Variable"),
-                };
+                let val: BasicValueEnum = expr.deref().first()?.emit(emitter).into();
+                let ptr = var.emit(emitter).unwrap().into_pointer_value();
+                emitter.builder.build_store(ptr, val).expect("Store failed");
                 None
             }
             tree::Variable::VarReference(name, dims) => {
                 let (ptr, ty) = emitter.get_var(name.deref()).unwrap();
                 if dims.is_empty() {
-                    Some(emitter.builder.build_load(ty, ptr, name.deref()).unwrap().as_basic_value_enum().into())
+                    Some(ptr.as_basic_value_enum())
                 } else {
                     let mut idx_vals = vec![emitter.context.i32_type().const_zero()];
                     idx_vals.extend(dims.deref().iter().map(|dim| dim.emit(emitter).into_int_value()));
-
-                    Some(emitter.builder.build_load(
-                        ty,
-                        unsafe {
-                            emitter.builder.build_in_bounds_gep(ty, ptr, idx_vals.as_ref(), "index").unwrap()
-                        },
-                        name.deref()
-                    ).unwrap().into())
+                    Some(unsafe {
+                        emitter.builder.build_in_bounds_gep(ty, ptr, idx_vals.as_ref(), "index").unwrap().as_basic_value_enum()
+                    })
                 }
             }
             tree::Variable::VarDeclaration(name, ty, dims) => {
                 let ty = if dims.is_empty() {
                     ty.deref().emit(emitter)?.get_type().into()
                 } else {
-                    let dims = dims.deref().iter().rev().map(|dim|
-                        dim.emit(emitter).into_int_value()).collect::<Vec<IntValue>>();
+                    let dims = get_array_dims(dims, emitter);
                     dims.iter().fold(
                         emitter.context.i32_type().as_basic_type_enum(),
                         |acc, len| acc.array_type(len.get_zero_extended_constant().unwrap() as u32)
@@ -268,9 +187,79 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
                 None
             }
             tree::Variable::FormalParameter(_, ty, _) => ty.deref().emit(emitter),
-            // tree::Variable::StructDefinition(name, vars) => {}
-            // tree::Variable::StructDeclaration(structname, inst, members) => {}
-            // tree::Variable::StructReference(vars) => {}
+            tree::Variable::StructDefinition(name, vars) => {
+                let mut field_hashmap = HashMap::new();
+                let mut struct_types = vec![];
+                for (i, var) in vars.iter().enumerate() {
+                    match var {
+                        tree::Variable::VarDeclaration(field_name, ty, dims) => {
+                            let ty = if dims.is_empty() {
+                                ty.deref().emit(emitter).unwrap().get_type().as_basic_type_enum()
+                            } else {
+                                let dims = get_array_dims(dims, emitter);
+                                dims.iter().fold(
+                                    ty.deref().emit(emitter).unwrap().get_type().as_basic_type_enum(),
+                                    |acc, len| acc.array_type(len.get_zero_extended_constant().unwrap() as u32)
+                                        .as_basic_type_enum()
+                                )
+                            };
+                            field_hashmap.insert(field_name.deref().as_str(), i);
+                            struct_types.push(ty);
+                        },
+                        _ => unimplemented!()
+                    }
+                }
+                emitter.struct_fields.insert(name.deref(), field_hashmap);
+                let struct_type = emitter.context.opaque_struct_type(name.deref());
+                struct_type.set_body(struct_types.as_slice(), false);
+
+                None
+            }
+            tree::Variable::StructDeclaration(structname, inst, dims) => {
+                let struct_type = emitter.module.get_struct_type(structname.deref()).unwrap();
+                let ty = if dims.is_empty() {
+                    struct_type.as_basic_type_enum()
+                } else {
+                    let dims = get_array_dims(dims, emitter);
+                    dims.iter().fold(struct_type.as_basic_type_enum(),
+                        |acc, len|
+                            acc.array_type(len.get_zero_extended_constant().unwrap() as u32).as_basic_type_enum()
+                    )
+                };
+                let new_var = emitter.builder.build_alloca(ty, inst.deref()).unwrap();
+                emitter.scope.last_mut().unwrap().insert(inst.deref(), (new_var, ty));
+                None
+            }
+            tree::Variable::StructReference(vars) => {
+                vars.deref().iter().fold(None,
+                    |base, member| {
+                        if base.is_none() {
+                            return member.emit(emitter);
+                        }
+
+                        let struct_ptr = base.unwrap().into_pointer_value();
+                        let struct_type = emitter.get_var(struct_ptr.get_name().to_str().unwrap())?.1.into_struct_type();
+                        let field_hashmap = emitter.struct_fields.get(struct_type.get_name()?.to_str().unwrap()).unwrap();
+
+                        if let tree::Variable::VarReference(name, dims) = member {
+                            let field_idx = field_hashmap.get(name.deref().as_str()).unwrap();
+                            unsafe {
+                                let field_ptr = emitter.builder
+                                    .build_struct_gep(struct_type, struct_ptr, *field_idx as u32, name.deref()).unwrap();
+                                let field_ty = struct_type.get_field_type_at_index_unchecked(*field_idx as u32);
+
+                                if dims.is_empty() {
+                                    Some(field_ptr.as_basic_value_enum())
+                                } else {
+                                    let mut idx_vals = vec![emitter.context.i32_type().const_zero()];
+                                    idx_vals.extend(dims.deref().iter().map(|dim| dim.emit(emitter).into_int_value()));
+                                    Some(emitter.builder.build_in_bounds_gep(field_ty, field_ptr, idx_vals.as_ref(), "index").unwrap().as_basic_value_enum())
+                                }
+                            }
+                        } else { None }
+                    }
+                )
+            }
             _ => panic!("Error in Variable"),
         }
     }
@@ -289,14 +278,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Function {
                     param.emit(emitter).unwrap().get_type().into()
                 ).collect::<Vec<BasicMetadataTypeEnum>>();
 
-                let ret_ty = match *ret_ty.deref() {
-                    tree::Value::Integer(_) => emitter.context.i32_type().fn_type(paras_ty.as_ref(), false),
-                    tree::Value::Float(_) => emitter.context.f32_type().fn_type(paras_ty.as_ref(), false),
-                    tree::Value::Char(_) => emitter.context.i8_type().fn_type(paras_ty.as_ref(), false),
-                    tree::Value::Pointer(_) => emitter.context.ptr_type(AddressSpace::default()).fn_type(paras_ty.as_ref(), false),
-                    tree::Value::Null => emitter.context.void_type().fn_type(paras_ty.as_ref(), false),
-                    _ => panic!("Error in Function"),
-                };
+                let ret_ty = ret_ty.deref().emit(emitter)?.get_type().fn_type(paras_ty.as_ref(), false);
                 let func = emitter.module.add_function(name, ret_ty, None);
                 let entry = emitter.context.append_basic_block(func, "entry");
                 emitter.builder.position_at_end(entry);
@@ -304,10 +286,10 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Function {
                 for (i, param) in params.iter().enumerate() {
                      if let tree::Variable::FormalParameter(name, _, _) = param {
                          let value = func.get_nth_param(i as u32).unwrap();
-                         value.set_name(name);
+                         value.set_name(name.deref());
 
-                         let ptr = emitter.builder.build_alloca(value.get_type(), name).unwrap();
-                         emitter.builder.build_store(ptr, value).expect("");
+                         let ptr = emitter.builder.build_alloca(value.get_type(), name.deref()).unwrap();
+                         emitter.builder.build_store(ptr, value).expect("Store failed");
                          emitter.scope.last_mut().unwrap().insert(name, (ptr, value.get_type().into()));
                     } else {
                         panic!("Error in Function");
@@ -333,7 +315,6 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Function {
                 }
 
                 let func = emitter.module.get_function((*name).as_str()).expect("Function undeclared");
-                let args = params.iter().map(|param| param.emit(emitter).into()).collect::<Vec<BasicMetadataValueEnum>>();
                 Some(emitter.builder.build_call(func, args.as_slice(), (*name).as_str()).unwrap()
                     .try_as_basic_value()
                     .left()
@@ -351,9 +332,9 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Body {
     {
         match self {
             tree::Body::Body(stmts) => {
-                for stmt in stmts {
-                    stmt.emit(emitter);
-                }
+                emitter.scope.push(HashMap::new());
+                let _ = stmts.iter().map(|stmt| stmt.emit(emitter)).collect::<Vec<()>>();
+                emitter.scope.pop();
             }
             _ => panic!("Error in Body"),
         }
@@ -512,7 +493,11 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
     {
         match self {
             tree::CompExpr::Value(val) => val.emit(emitter).unwrap(),
-            tree::CompExpr::Variable(var) => var.emit(emitter).unwrap(),
+            tree::CompExpr::Variable(var) => {
+                let ptr = var.emit(emitter).unwrap();
+                let ty = emitter.get_var_type(&var.get_name()).unwrap();
+                emitter.builder.build_load(ty, ptr.into_pointer_value(), &var.get_name()).unwrap().as_basic_value_enum()
+            },
             tree::CompExpr::FuncCall(function) => {
                 function.emit(emitter).unwrap_or(
                     emitter.context.i32_type().const_int(0, false).as_basic_value_enum()
@@ -525,26 +510,11 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
                     panic!("Must be a pointer");
                 };
                 match op {
-                    tree::UnaryOperator::Ref => {
-                        let ptr = if let tree::Variable::VarReference(name, dims) = var {
-                            let (ptr, ty) = emitter.get_var(name.deref()).unwrap();
-                            // let (ptr, ty) = (*ptr, *ty);
-                            if dims.is_empty() {
-                                ptr
-                            } else {
-                                let mut idx_vals = vec![emitter.context.i32_type().const_zero()];
-                                idx_vals.extend(dims.deref().iter().map(|dim| dim.emit(emitter).into_int_value()));
-                                unsafe {
-                                    emitter.builder.build_in_bounds_gep(ty, ptr, idx_vals.as_ref(), "index").unwrap()
-                                }
-                            }
-                        } else {
-                            panic!("Must be a pointer");
-                        };
-                        ptr.as_basic_value_enum()
-                    }
+                    tree::UnaryOperator::Ref => var.emit(emitter).unwrap(),
                     tree::UnaryOperator::Deref => {
-                        var.emit(emitter).unwrap()
+                        let ptr = var.emit(emitter).unwrap().into_pointer_value();
+                        let ty = emitter.get_var_type(&var.get_name()).unwrap();
+                        emitter.builder.build_load(ty, ptr, &var.get_name()).unwrap().as_basic_value_enum()
                     }
                     _ => panic!("Operator not supported in CompExpr"),
                 }
@@ -712,4 +682,11 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Value {
             _ => panic!("Error in Value"),
         }
     }
+}
+
+fn get_array_dims<'ast, 'ctx>(dims: &'ast Vec<tree::CompExpr>, emitter: &mut Azuki<'ast, 'ctx>) -> Vec<IntValue<'ctx>>
+    where 'ast: 'ctx
+{
+    dims.deref().iter().rev().map(|dim|
+        dim.emit(emitter).into_int_value()).collect::<Vec<IntValue>>()
 }

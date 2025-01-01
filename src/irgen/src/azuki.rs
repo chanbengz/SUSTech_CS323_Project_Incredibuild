@@ -1,6 +1,5 @@
 use inkwell as llvm;
 use std::collections::HashMap;
-// use std::hash::Hash;
 use inkwell::AddressSpace;
 use inkwell::memory_buffer::MemoryBuffer;
 use inkwell::module::Linkage;
@@ -29,7 +28,7 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
             context,
             builder: context.create_builder(),
             module,
-            scope: vec![HashMap::new()],
+            scope: Vec::new(),
             loops: Vec::new(),
             struct_fields: HashMap::new(),
             printf: None,
@@ -107,6 +106,26 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
             return Some((ptr, ty));
         };
         None
+    }
+
+    pub(crate) fn get_var_type(&self, name: &str) -> Option<BasicTypeEnum<'ctx>> {
+        for scope in self.scope.iter().rev() {
+            if let Some((_, ty)) = scope.get(name) {
+                return Some(*ty);
+            }
+        }
+        if let Some(gv) = self.module.get_global(name) {
+            return Some(gv.get_value_type().try_into().unwrap());
+        }
+        name.split('.').fold(None, |acc, field| {
+            if acc.is_none() {
+                Some(self.get_var(field)?.1)
+            } else {
+                let struct_ty = acc.unwrap().into_struct_type();
+                let index = self.struct_fields.get(struct_ty.get_name()?.to_str().unwrap())?.get(field)?;
+                struct_ty.get_field_type_at_index(*index as u32)
+            }
+        })
     }
 
     pub(crate) fn no_terminator(&self) -> bool {
