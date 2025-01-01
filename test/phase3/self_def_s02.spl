@@ -2,7 +2,7 @@ int arr[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
 
 int main() {
     int arr2[5] = {1, 2, 3, 4, 5};
-    arr[5] = 8 + arr[2];
+    arr[5] = 8;
     arr2[3] = {7, 8};
     printf("%d %d %d %d %d\n", arr[3], arr[4], arr[5], arr[6], arr[7]);
     printf("%d %d %d %d %d\n", arr2[0], arr2[1], arr2[2], arr2[3], arr2[4]);
