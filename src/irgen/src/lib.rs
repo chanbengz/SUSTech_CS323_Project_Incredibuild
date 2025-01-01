@@ -45,12 +45,15 @@ mod tests {
     #[allow(unused_imports)]
     use crate::{emit_llvmir, emit_llvmir_to_file, emit_object};
 
-    fn test_from_file(source_path: &str, expected_path: &str, ir: bool) {
+    fn test_from_file(source_path: &str, expected_path: &str, ir: bool, print_ast: bool) {
         let mut source = String::new();
         let mut expected = String::new();
         File::open(source_path).unwrap().read_to_string(&mut source).unwrap();
         File::open(expected_path).unwrap().read_to_string(&mut expected).unwrap();
         let ast = spl_parser::parse(&source).unwrap();
+        if print_ast {
+            print!("{:?}", ast);
+        }
         let res = if ir {
             emit_llvmir(source_path.split("/").last().unwrap(), ast)
         } else {
@@ -130,15 +133,15 @@ mod tests {
 
     #[test]
     fn gen_test_r00() {
-        test_from_file("../../test/test_0_r00.spl", "../../test/test_0_r00.ll", true);
+        test_from_file("../../test/test_0_r00.spl", "../../test/test_0_r00.ll", true, false);
     }
 
     #[test]
     fn test_self_define() {
-        for i in 1..=1 {
+        for i in 1..=2 {
             let source_path = format!("../../test/phase3/self_def_s{:02}.spl", i);
             let expected_path = format!("../../test/phase3/self_def_s{:02}.ll", i);
-            test_from_file(&source_path, &expected_path, true);
+            test_from_file(&source_path, &expected_path, true, false);
         }
     }
 
@@ -147,7 +150,7 @@ mod tests {
         for i in 1..=6 {
             let source_path = format!("../../test/phase3/test_3_r{:02}.spl", i);
             let expected_path = format!("../../test/phase3/test_3_r{:02}.ll", i);
-            test_from_file(&source_path, &expected_path, true);
+            test_from_file(&source_path, &expected_path, true, false);
         }
     }
 }
