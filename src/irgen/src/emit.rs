@@ -148,7 +148,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
 
 // Variable operations inside function bodies
 impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
-    type Output = Option<BasicValueEnum<'ctx>>;
+    type Output = Option<(BasicValueEnum<'ctx>, BasicTypeEnum<'ctx>)>;
     fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output
         where 'ast:'ctx
     {
@@ -156,17 +156,30 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
             tree::Variable::VarAssignment(var, expr) => {
                 if expr.deref().len() == 1 {
                     let val: BasicValueEnum = expr.deref().first()?.emit(emitter).into();
-                    let ptr_t = var.emit(emitter).unwrap().into_pointer_value();
+                    let ptr_t = var.emit(emitter).unwrap().0.into_pointer_value();
                     emitter.builder.build_store(ptr_t, val).expect("Store failed");
                 } else {
-                    let ptr = var.emit(emitter).unwrap().into_pointer_value();
+                    let (ptr, ty) = var.emit(emitter).unwrap();
+
+                    // Get the dimensions information.
+                    let mut arr_typ = ty;
+                    let mut dims = vec![];
+                    while arr_typ.is_array_type() {
+                        dims.push(arr_typ.into_array_type().len() as u32);
+                        arr_typ = arr_typ.into_array_type().get_element_type();
+                    }
+
                     let assign_vals = expr.deref().iter().map(|expr| expr.emit(emitter)).collect::<Vec<BasicValueEnum>>();
 
                     for (i, val) in assign_vals.iter().enumerate() {
-                        let idx_vals = vec![emitter.context.i32_type().const_zero(), emitter.context.i32_type().const_int(i as u64, false)];
-                        let array_type = emitter.context.i32_type().as_basic_type_enum().array_type(assign_vals.len() as u32).as_basic_type_enum();
+                        let mut idx_vals = vec![emitter.context.i32_type().const_zero()];
+                        let mut e = i as u32;
+                        for d in dims.iter() {
+                            idx_vals.insert(1, emitter.context.i32_type().const_int((e % d).into(), false));
+                            e /= d;
+                        }
                         let ptr_t = unsafe {
-                            emitter.builder.build_gep(array_type, ptr, idx_vals.as_slice(), "index").unwrap()
+                            emitter.builder.build_gep(ty, ptr.into_pointer_value(), idx_vals.as_slice(), "index").unwrap()
                         };
                         emitter.builder.build_store(ptr_t, *val).expect("Store failed");
                     }
@@ -176,13 +189,26 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
             tree::Variable::VarReference(name, dims) => {
                 let (ptr, ty) = emitter.get_var(name.deref()).unwrap();
                 if dims.is_empty() {
-                    Some(ptr.as_basic_value_enum())
+                    Some((ptr.as_basic_value_enum(), ty))
                 } else {
                     let mut idx_vals = vec![emitter.context.i32_type().const_zero()];
                     idx_vals.extend(dims.deref().iter().map(|dim| dim.emit(emitter).into_int_value()));
-                    Some(unsafe {
+
+                    let mut arr_typ = ty;
+                    let mut ref_dims = dims.deref().clone();
+                    match ty {
+                        BasicTypeEnum::ArrayType(_) => {
+                            while arr_typ.is_array_type() && !ref_dims.is_empty() {
+                                arr_typ = arr_typ.into_array_type().get_element_type();
+                                ref_dims.pop();
+                            }
+                        }
+                        _ => panic!("Not Array Type")
+                    }
+                    
+                    Some((unsafe {
                         emitter.builder.build_in_bounds_gep(ty, ptr, idx_vals.as_ref(), "index").unwrap().as_basic_value_enum()
-                    })
+                    }, arr_typ.into()))
                 }
             }
             tree::Variable::VarDeclaration(name, ty, dims) => {
@@ -200,7 +226,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
                 emitter.scope.last_mut().unwrap().insert(name.deref(), (new_var, ty));
                 None
             }
-            tree::Variable::FormalParameter(_, ty, _) => ty.deref().emit(emitter),
+            tree::Variable::FormalParameter(_, ty, _) => Some((ty.deref().emit(emitter).unwrap(), emitter.context.i32_type().into())),
             tree::Variable::StructDefinition(name, vars) => {
                 let mut field_hashmap = HashMap::new();
                 let mut struct_types = vec![];
@@ -251,7 +277,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
                             return member.emit(emitter);
                         }
 
-                        let struct_ptr = base.unwrap().into_pointer_value();
+                        let struct_ptr = base.unwrap().0.into_pointer_value();
                         let struct_type = emitter.get_var(struct_ptr.get_name().to_str().unwrap())?.1.into_struct_type();
                         let field_hashmap = emitter.struct_fields.get(struct_type.get_name()?.to_str().unwrap()).unwrap();
 
@@ -263,11 +289,11 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
                                 let field_ty = struct_type.get_field_type_at_index_unchecked(*field_idx as u32);
 
                                 if dims.is_empty() {
-                                    Some(field_ptr.as_basic_value_enum())
+                                    Some((field_ptr.as_basic_value_enum(), field_ty))
                                 } else {
                                     let mut idx_vals = vec![emitter.context.i32_type().const_zero()];
                                     idx_vals.extend(dims.deref().iter().map(|dim| dim.emit(emitter).into_int_value()));
-                                    Some(emitter.builder.build_in_bounds_gep(field_ty, field_ptr, idx_vals.as_ref(), "index").unwrap().as_basic_value_enum())
+                                    Some((emitter.builder.build_in_bounds_gep(field_ty, field_ptr, idx_vals.as_ref(), "index").unwrap().as_basic_value_enum(), field_ty))
                                 }
                             }
                         } else { None }
@@ -289,7 +315,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Function {
                 emitter.scope.push(HashMap::new());
 
                 let paras_ty = params.iter().map(|param|
-                    param.emit(emitter).unwrap().get_type().into()
+                    param.emit(emitter).unwrap().0.get_type().into()
                 ).collect::<Vec<BasicMetadataTypeEnum>>();
 
                 let ret_ty = ret_ty.deref().emit(emitter)?.get_type().fn_type(paras_ty.as_ref(), false);
@@ -373,7 +399,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Expr {
                 function.emit(emitter);
             },
             tree::Expr::VarManagement(vars, _) => {
-                let _ = vars.iter().map(|var| var.emit(emitter)).collect::<Vec<Option<BasicValueEnum>>>();
+                vars.iter().for_each(|var| {var.emit(emitter);});
             },
             tree::Expr::If(if_expr, _) => {
                 match if_expr {
@@ -508,8 +534,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
         match self {
             tree::CompExpr::Value(val) => val.emit(emitter).unwrap(),
             tree::CompExpr::Variable(var) => {
-                let ptr = var.emit(emitter).unwrap();
-                let ty: BasicTypeEnum<'ctx> = emitter.get_var_type(&var.get_name()).unwrap();
+                let (ptr, ty) = var.emit(emitter).unwrap();
                 emitter.builder.build_load(ty, ptr.into_pointer_value(), &var.get_name()).unwrap().as_basic_value_enum()
             },
             tree::CompExpr::FuncCall(function) => {
@@ -524,9 +549,9 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
                     panic!("Must be a pointer");
                 };
                 match op {
-                    tree::UnaryOperator::Ref => var.emit(emitter).unwrap(),
+                    tree::UnaryOperator::Ref => var.emit(emitter).unwrap().0,
                     tree::UnaryOperator::Deref => {
-                        let ptr = var.emit(emitter).unwrap().into_pointer_value();
+                        let ptr = var.emit(emitter).unwrap().0.into_pointer_value();
                         let ty = emitter.get_var_type(&var.get_name()).unwrap();
                         emitter.builder.build_load(ty, ptr, &var.get_name()).unwrap().as_basic_value_enum()
                     }
