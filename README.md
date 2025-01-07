@@ -67,9 +67,9 @@ See `target/debug/incredibuild -h` for more options.
 │   ├── cs323-project-tutorial3.pdf
 │   ├── cs323-project-tutorial4.pdf
 │   ├── midterm-project-check.pdf
-│   ├── slides # Presentation slides
-│   ├── syntax.txt
-│   └── token.txt
+│   ├── slides     # Presentation slides
+│   ├── syntax.txt # SPL syntax spec
+│   └── token.txt  # token spec
 ├── LICENSE
 ├── README.md
 ├── src
@@ -85,7 +85,7 @@ See `target/debug/incredibuild -h` for more options.
 │   ├── lexer
 │   │   ├── Cargo.toml
 │   │   └── src
-│   ├── main.rs
+│   ├── main.rs # warpper
 │   └── parser
 │       ├── build.rs # lalrpop parser generator
 │       ├── Cargo.toml
@@ -95,6 +95,8 @@ See `target/debug/incredibuild -h` for more options.
     ├── phase2 # Semantic
     ├── phase3 # LLVM IR Generation
     ├── phase4 # Binary Generation
+    ├── mid    # Midterm check phase1-2
+    ├── final  # Final check phase3-4
     ├── test_0_r00.spl # Minimal testcase
     ├── test_0_r00.ll  # LLVM IR of the minimal testcase
     └── test_0_r00.out # Sample output
@@ -103,7 +105,7 @@ See `target/debug/incredibuild -h` for more options.
 
 ## Development
 
-Setting up environment might be a stuggling process, you can use `docker` to build up the environment.
+Setting up environment might be a struggling process, you can use `docker` to build up the environment.
 
 ```bash
 docker build -t incredibuild .
