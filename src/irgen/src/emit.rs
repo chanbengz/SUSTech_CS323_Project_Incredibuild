@@ -8,6 +8,10 @@ use spl_ast::tree;
 use crate::azuki::Azuki;
 
 
+/// Emit trait is used for AST nodes to emit LLVM IR recursively.
+/// LLVM defines a set of types: Struct, Array, Function, Pointer, Int, Float...
+/// The concrete type can be cast to BasicTypeEnum...
+/// Perhaps we should have a tutorial on THIS
 pub trait Emit<'ast, 'ctx> {
     type Output;
     fn emit(&'ast self, emitter: &mut Azuki<'ast, 'ctx>) -> Self::Output where 'ast:'ctx;
@@ -19,11 +23,8 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Program {
         where 'ast:'ctx
     {
         match self {
-            tree::Program::Program(parts) => {
-                for part in parts {
-                    part.emit(emitter);
-                }
-            }
+            // Top of all, list of global definitions and functions
+            tree::Program::Program(parts) => { parts.iter().for_each(|part| part.emit(emitter)); }
             tree::Program::Error => panic!("Error in Program"),
         }
     }
@@ -35,6 +36,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::ProgramPart {
         where 'ast:'ctx
     {
         match self {
+            // Emit the global variables and functions
             tree::ProgramPart::Statement(stmt) => stmt.emit(emitter),
             tree::ProgramPart::Function(func) => { func.emit(emitter); },
         }
@@ -48,95 +50,91 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Statement {
     {
         match self {
             tree::Statement::GlobalVariable(vars, _) => {
-                for var in vars {
-                    match var {
-                        tree::Variable::VarAssignment(var, expr) => {
-                            match var.as_ref() {
-                                tree::Variable::VarDeclaration(name, ty, dims) => {
-                                    // Dimensions reference
-                                    let dims = get_array_dims(dims, emitter);
-                                    let ty = if dims.is_empty() {
-                                        ty.deref().emit(emitter).unwrap().get_type().as_basic_type_enum()
-                                    } else {
-                                        dims.iter().fold(
-                                            ty.deref().emit(emitter).unwrap().get_type().as_basic_type_enum(),
-                                            |acc, len| acc.array_type(len.get_zero_extended_constant().unwrap() as u32)
-                                                .as_basic_type_enum()
-                                        )
-                                    };
-                                    match ty {
-                                        BasicTypeEnum::ArrayType(_) => {
-                                            // Get the array values
-                                            let assign_vals = expr.deref().iter().map(|expr| expr.emit(emitter)).collect::<Vec<BasicValueEnum>>();
-                                            
-                                            let mut dims = dims.iter();
-                                            let top_size = dims.next().unwrap().get_zero_extended_constant().unwrap() as u32;
+                vars.iter().for_each(|var| match var {
+                    tree::Variable::VarAssignment(var, expr) => {
+                        match var.as_ref() {
+                            tree::Variable::VarDeclaration(name, ty, dims) => {
+                                // Dimensions reference
+                                let dims = get_array_dims(dims, emitter);
+                                let ty = if dims.is_empty() {
+                                    ty.deref().emit(emitter).unwrap().get_type().as_basic_type_enum()
+                                } else {
+                                    dims.iter().fold(
+                                        ty.deref().emit(emitter).unwrap().get_type().as_basic_type_enum(),
+                                        |acc, len| acc.array_type(len.get_zero_extended_constant().unwrap() as u32)
+                                            .as_basic_type_enum()
+                                    )
+                                };
+                                match ty {
+                                    BasicTypeEnum::ArrayType(_) => {
+                                        // Get the array values
+                                        let assign_vals = expr.deref().iter().map(|expr| expr.emit(emitter)).collect::<Vec<BasicValueEnum>>();
+                                        
+                                        let mut dims = dims.iter();
+                                        let top_size = dims.next().unwrap().get_zero_extended_constant().unwrap() as u32;
 
-                                            let mut arrays = assign_vals
-                                                .chunks(top_size as usize)
-                                                .map(|a| 
-                                                    // emitter.context.i32_type().const_array(a.into_iter().map(|v| v.into_int_value()).collect::<Vec<IntValue>>().as_slice())
-                                                    {
-                                                        match a[0] {
-                                                            BasicValueEnum::IntValue(_) => emitter.context.i32_type().const_array(a.into_iter().map(|v| v.into_int_value()).collect::<Vec<IntValue>>().as_slice()),
-                                                            BasicValueEnum::FloatValue(_) => emitter.context.f32_type().const_array(a.into_iter().map(|v| v.into_float_value()).collect::<Vec<FloatValue>>().as_slice()),
-                                                            _ => panic!("Not support type of array")
-                                                        }
-                                                    }
-                                                )
+                                        let mut arrays = assign_vals.chunks(top_size as usize)
+                                            .map(|a| {
+                                                match a[0] {
+                                                    BasicValueEnum::IntValue(_) => emitter.context.i32_type()
+                                                        .const_array(a.into_iter().map(|v| v.into_int_value()).collect::<Vec<IntValue>>().as_slice()),
+                                                    BasicValueEnum::FloatValue(_) => emitter.context.f32_type()
+                                                        .const_array(a.into_iter().map(|v| v.into_float_value()).collect::<Vec<FloatValue>>().as_slice()),
+                                                    _ => panic!("Not support type of array")
+                                                }
+                                            })
+                                            .collect::<Vec<ArrayValue>>();
+
+                                        let mut array_ty = emitter.context.i32_type().array_type(top_size);
+
+                                        // If it is a multidimensional array
+                                        for dim in dims {
+                                            let size = dim.get_zero_extended_constant().unwrap() as u32;
+                                            arrays = arrays
+                                                .chunks(size as usize)
+                                                .map(|a| array_ty.const_array(a))
                                                 .collect::<Vec<ArrayValue>>();
-
-                                            let mut array_ty = emitter.context.i32_type().array_type(top_size);
-
-                                            // If it is a multidimensional array
-                                            for dim in dims {
-                                                let size = dim.get_zero_extended_constant().unwrap() as u32;
-                                                arrays = arrays
-                                                    .chunks(size as usize)
-                                                    .map(|a| array_ty.const_array(a))
-                                                    .collect::<Vec<ArrayValue>>();
-                                                array_ty = array_ty.array_type(size);
-                                            }
-                                            // Get the global variable and its pointer and its type (ArrayType if it is an array)
-                                            let global = emitter.module.add_global(array_ty, Some(AddressSpace::default()), name.deref());
-                                            global.set_initializer(&arrays.as_slice()[0]);
-                                        },
-                                        BasicTypeEnum::IntType(_) => {
-                                            let val = expr.deref().first().unwrap().emit(emitter).into_int_value();
-                                            let global = emitter.module.add_global(ty, None, name.deref());
-                                            global.set_initializer(&val);
-                                        },
-                                        BasicTypeEnum::FloatType(_) => {
-                                            let val = expr.deref().first().unwrap().emit(emitter).into_float_value();
-                                            let global = emitter.module.add_global(ty, None, name.deref());
-                                            global.set_initializer(&val);
-                                        },
-                                        _ => {
-                                            unimplemented!()
+                                            array_ty = array_ty.array_type(size);
                                         }
+                                        // Get the global variable and its pointer and its type (ArrayType if it is an array)
+                                        let global = emitter.module.add_global(array_ty, Some(AddressSpace::default()), name.deref());
+                                        global.set_initializer(&arrays.as_slice()[0]);
+                                    },
+                                    BasicTypeEnum::IntType(_) => {
+                                        let val = expr.deref().first().unwrap().emit(emitter).into_int_value();
+                                        let global = emitter.module.add_global(ty, None, name.deref());
+                                        global.set_initializer(&val);
+                                    },
+                                    BasicTypeEnum::FloatType(_) => {
+                                        let val = expr.deref().first().unwrap().emit(emitter).into_float_value();
+                                        let global = emitter.module.add_global(ty, None, name.deref());
+                                        global.set_initializer(&val);
+                                    },
+                                    _ => {
+                                        unimplemented!()
                                     }
                                 }
-                                _ => unimplemented!()
                             }
-                        },
-                        tree::Variable::VarDeclaration(name, ty, dims) => {
-                            let dims = get_array_dims(dims, emitter);
-                            let ty = if dims.is_empty() {
-                                ty.deref().emit(emitter).unwrap().get_type().as_basic_type_enum()
-                            } else {
-                                dims.iter().fold(
-                                    ty.deref().emit(emitter).unwrap().get_type().as_basic_type_enum(),
-                                    |acc, len| acc.array_type(len
-                                        .get_zero_extended_constant().unwrap() as u32)
-                                        .as_basic_type_enum()
-                                )
-                            };
-                            let global = emitter.module.add_global(ty, None, name.deref());
-                            global.set_initializer(&ty.const_zero());
-                        },
-                        _ => unimplemented!()
-                    }
-                }
+                            _ => unimplemented!()
+                        }
+                    },
+                    tree::Variable::VarDeclaration(name, ty, dims) => {
+                        let dims = get_array_dims(dims, emitter);
+                        let ty = if dims.is_empty() {
+                            ty.deref().emit(emitter).unwrap().get_type().as_basic_type_enum()
+                        } else {
+                            dims.iter().fold(
+                                ty.deref().emit(emitter).unwrap().get_type().as_basic_type_enum(),
+                                |acc, len| acc.array_type(len
+                                    .get_zero_extended_constant().unwrap() as u32)
+                                    .as_basic_type_enum()
+                            )
+                        };
+                        let global = emitter.module.add_global(ty, None, name.deref());
+                        global.set_initializer(&ty.const_zero());
+                    },
+                    _ => unimplemented!()
+                });
             }
             tree::Statement::Struct(def, _) => {
                 def.emit(emitter);
@@ -250,6 +248,7 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Variable {
                     }
                 }
                 emitter.struct_fields.insert(name.deref(), field_hashmap);
+                // We have to do it this way to index a struct type by its name from LLVM context
                 let struct_type = emitter.context.opaque_struct_type(name.deref());
                 struct_type.set_body(struct_types.as_slice(), false);
 
@@ -372,8 +371,9 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::Body {
     {
         match self {
             tree::Body::Body(stmts) => {
+                // nested scope
                 emitter.scope.push(HashMap::new());
-                let _ = stmts.iter().map(|stmt| stmt.emit(emitter)).collect::<Vec<()>>();
+                stmts.iter().for_each(|stmt| stmt.emit(emitter));
                 emitter.scope.pop();
             }
             _ => panic!("Error in Body"),
@@ -551,9 +551,8 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CompExpr {
                 match op {
                     tree::UnaryOperator::Ref => var.emit(emitter).unwrap().0,
                     tree::UnaryOperator::Deref => {
-                        let ptr = var.emit(emitter).unwrap().0.into_pointer_value();
-                        let ty = emitter.get_var_type(&var.get_name()).unwrap();
-                        emitter.builder.build_load(ty, ptr, &var.get_name()).unwrap().as_basic_value_enum()
+                        let (ptr, ty) = var.emit(emitter).unwrap();
+                        emitter.builder.build_load(ty, ptr.into_pointer_value(), &var.get_name()).unwrap().as_basic_value_enum()
                     }
                     _ => panic!("Operator not supported in CompExpr"),
                 }
@@ -669,33 +668,45 @@ impl<'ast, 'ctx> Emit<'ast, 'ctx> for tree::CondExpr {
                 let rhs = (*rhs.deref()).emit(emitter);
                 match op {
                     tree::JudgeOperator::GT => match lhs {
-                        BasicValueEnum::IntValue(lhs) => emitter.builder.build_int_compare(inkwell::IntPredicate::SGT, lhs, rhs.into_int_value(), "gttmp").unwrap().as_basic_value_enum(),
-                        BasicValueEnum::FloatValue(lhs) => emitter.builder.build_float_compare(inkwell::FloatPredicate::OGT, lhs, rhs.into_float_value(), "gttmp").unwrap().as_basic_value_enum(),
+                        BasicValueEnum::IntValue(lhs) => emitter.builder
+                            .build_int_compare(inkwell::IntPredicate::SGT, lhs, rhs.into_int_value(), "gttmp").unwrap().as_basic_value_enum(),
+                        BasicValueEnum::FloatValue(lhs) => emitter.builder
+                            .build_float_compare(inkwell::FloatPredicate::OGT, lhs, rhs.into_float_value(), "gttmp").unwrap().as_basic_value_enum(),
                         _ => panic!("Error in CondExpr"),
                     }
                     tree::JudgeOperator::GE => match lhs {
-                        BasicValueEnum::IntValue(lhs) => emitter.builder.build_int_compare(inkwell::IntPredicate::SGE, lhs, rhs.into_int_value(), "getmp").unwrap().as_basic_value_enum(),
-                        BasicValueEnum::FloatValue(lhs) => emitter.builder.build_float_compare(inkwell::FloatPredicate::OGE, lhs, rhs.into_float_value(), "getmp").unwrap().as_basic_value_enum(),
+                        BasicValueEnum::IntValue(lhs) => emitter.builder
+                            .build_int_compare(inkwell::IntPredicate::SGE, lhs, rhs.into_int_value(), "getmp").unwrap().as_basic_value_enum(),
+                        BasicValueEnum::FloatValue(lhs) => emitter.builder
+                            .build_float_compare(inkwell::FloatPredicate::OGE, lhs, rhs.into_float_value(), "getmp").unwrap().as_basic_value_enum(),
                         _ => panic!("Error in CondExpr"),
                     }
                     tree::JudgeOperator::LT => match lhs {
-                        BasicValueEnum::IntValue(lhs) => emitter.builder.build_int_compare(inkwell::IntPredicate::SLT, lhs, rhs.into_int_value(), "lttmp").unwrap().as_basic_value_enum(),
-                        BasicValueEnum::FloatValue(lhs) => emitter.builder.build_float_compare(inkwell::FloatPredicate::OLT, lhs, rhs.into_float_value(), "lttmp").unwrap().as_basic_value_enum(),
+                        BasicValueEnum::IntValue(lhs) => emitter.builder
+                            .build_int_compare(inkwell::IntPredicate::SLT, lhs, rhs.into_int_value(), "lttmp").unwrap().as_basic_value_enum(),
+                        BasicValueEnum::FloatValue(lhs) => emitter.builder
+                            .build_float_compare(inkwell::FloatPredicate::OLT, lhs, rhs.into_float_value(), "lttmp").unwrap().as_basic_value_enum(),
                         _ => panic!("Error in CondExpr"),
                     }
                     tree::JudgeOperator::LE => match lhs {
-                        BasicValueEnum::IntValue(lhs) => emitter.builder.build_int_compare(inkwell::IntPredicate::SLE, lhs, rhs.into_int_value(), "letmp").unwrap().as_basic_value_enum(),
-                        BasicValueEnum::FloatValue(lhs) => emitter.builder.build_float_compare(inkwell::FloatPredicate::OLE, lhs, rhs.into_float_value(), "letmp").unwrap().as_basic_value_enum(),
+                        BasicValueEnum::IntValue(lhs) => emitter.builder
+                            .build_int_compare(inkwell::IntPredicate::SLE, lhs, rhs.into_int_value(), "letmp").unwrap().as_basic_value_enum(),
+                        BasicValueEnum::FloatValue(lhs) => emitter.builder
+                            .build_float_compare(inkwell::FloatPredicate::OLE, lhs, rhs.into_float_value(), "letmp").unwrap().as_basic_value_enum(),
                         _ => panic!("Error in CondExpr"),
                     }
                     tree::JudgeOperator::EQ => match lhs {
-                        BasicValueEnum::IntValue(lhs) => emitter.builder.build_int_compare(inkwell::IntPredicate::EQ, lhs, rhs.into_int_value(), "eqtmp").unwrap().as_basic_value_enum(),
-                        BasicValueEnum::FloatValue(lhs) => emitter.builder.build_float_compare(inkwell::FloatPredicate::OEQ, lhs, rhs.into_float_value(), "eqtmp").unwrap().as_basic_value_enum(),
+                        BasicValueEnum::IntValue(lhs) => emitter.builder
+                            .build_int_compare(inkwell::IntPredicate::EQ, lhs, rhs.into_int_value(), "eqtmp").unwrap().as_basic_value_enum(),
+                        BasicValueEnum::FloatValue(lhs) => emitter.builder
+                            .build_float_compare(inkwell::FloatPredicate::OEQ, lhs, rhs.into_float_value(), "eqtmp").unwrap().as_basic_value_enum(),
                         _ => panic!("Error in CondExpr"),
                     }
                     tree::JudgeOperator::NE => match lhs {
-                        BasicValueEnum::IntValue(lhs) => emitter.builder.build_int_compare(inkwell::IntPredicate::NE, lhs, rhs.into_int_value(), "netmp").unwrap().as_basic_value_enum(),
-                        BasicValueEnum::FloatValue(lhs) => emitter.builder.build_float_compare(inkwell::FloatPredicate::ONE, lhs, rhs.into_float_value(), "netmp").unwrap().as_basic_value_enum(),
+                        BasicValueEnum::IntValue(lhs) => emitter.builder
+                            .build_int_compare(inkwell::IntPredicate::NE, lhs, rhs.into_int_value(), "netmp").unwrap().as_basic_value_enum(),
+                        BasicValueEnum::FloatValue(lhs) => emitter.builder
+                            .build_float_compare(inkwell::FloatPredicate::ONE, lhs, rhs.into_float_value(), "netmp").unwrap().as_basic_value_enum(),
                         _ => panic!("Error in CondExpr"),
                     }
                     _ => panic!("Error in CondExpr"),

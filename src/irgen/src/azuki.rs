@@ -8,6 +8,14 @@ use inkwell::types::{BasicTypeEnum, IntType};
 use inkwell::values::{BasicMetadataValueEnum, PointerValue};
 use inkwell::basic_block::BasicBlock;
 
+
+/// Despite its name, it's used to store the LLVM context during IR generation
+/// 'ctx is the lifetime of the LLVM context, 'ast is the lifetime of the input AST
+/// `printf` and `scanf` store the function values, lazy initialized
+/// scope is a stack of hashmaps, each hashmap stores the variables in the current scope
+/// loops is a stack of Loop structs, each struct stores the loop_start and after_loop basic blocks
+/// struct_fields is a hashmap of hashmaps, the first hashmap stores the struct name and the second
+/// hashmap stores the field names and their indices
 pub(crate) struct Azuki<'ast, 'ctx> {
     pub context: &'ctx llvm::context::Context,
     pub builder: llvm::builder::Builder<'ctx>,
@@ -22,12 +30,10 @@ pub(crate) struct Azuki<'ast, 'ctx> {
 
 impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
     pub fn new(context: &'ctx llvm::context::Context, source: &str) -> Self {
-        let module = context.create_module(source);
-
         Self {
             context,
             builder: context.create_builder(),
-            module,
+            module: context.create_module(source),
             scope: Vec::new(),
             loops: Vec::new(),
             struct_fields: HashMap::new(),
@@ -61,9 +67,7 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
     pub(crate) fn emit_global_string(&mut self, string: &mut String, name: &str) -> PointerValue<'ctx> {
         string.push('\0');
         let ty = self.context.i8_type().array_type(string.len() as u32);
-        let gv = self
-            .module
-            .add_global(ty, Some(AddressSpace::default()), name);
+        let gv = self.module.add_global(ty, Some(AddressSpace::default()), name);
         gv.set_linkage(Linkage::Internal);
         gv.set_initializer(&self.context.const_string(string.as_ref(), false));
 
@@ -76,6 +80,7 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
         pointer_value.unwrap()
     }
 
+    // Generate Assembly on the fly
     pub(crate) fn gen_code(&mut self) -> MemoryBuffer {
         Target::initialize_all(&InitializationConfig::default());
         let triple = TargetMachine::get_default_triple();
@@ -94,6 +99,7 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
         target_machine.write_to_memory_buffer(&self.module, FileType::Assembly).unwrap()
     }
 
+    // Get variable from all scopes
     pub(crate) fn get_var(&self, name: &str) -> Option<(PointerValue<'ctx>, BasicTypeEnum<'ctx>)> {
         for scope in self.scope.iter().rev() {
             if let Some((ptr, ty)) = scope.get(name) {
@@ -106,26 +112,6 @@ impl<'ast, 'ctx> Azuki<'ast, 'ctx> {
             return Some((ptr, ty));
         };
         None
-    }
-
-    pub(crate) fn get_var_type(&self, name: &str) -> Option<BasicTypeEnum<'ctx>> {
-        for scope in self.scope.iter().rev() {
-            if let Some((_, ty)) = scope.get(name) {
-                return Some(*ty);
-            }
-        }
-        if let Some(gv) = self.module.get_global(name) {
-            return Some(gv.get_value_type().try_into().unwrap());
-        }
-        name.split('.').fold(None, |acc, field| {
-            if acc.is_none() {
-                Some(self.get_var(field)?.1)
-            } else {
-                let struct_ty = acc.unwrap().into_struct_type();
-                let index = self.struct_fields.get(struct_ty.get_name()?.to_str().unwrap())?.get(field)?;
-                struct_ty.get_field_type_at_index(*index as u32)
-            }
-        })
     }
 
     pub(crate) fn no_terminator(&self) -> bool {
