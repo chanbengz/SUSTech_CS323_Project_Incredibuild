@@ -2,6 +2,11 @@
 name = "incredibuild"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.84.0"
+repository = "https://github.com/chanbengz/SUSTech_CS323_Project_Incredibuild"
+license = "MIT"
+authors = ["Ben Chen <chanben04gz@gmail.com>", "Yicheng Xiao <xiaoyc2022@mail.sustech.edu.cn>"]
+description = "A Compiler for SUSTech Programming Language"
 
 [workspace]
 members = [
@@ -16,6 +21,6 @@ members = [
 [dependencies]
 clap = "4.5.22"
 colored = "2.1.0"
-spl_parser = { path = "src/parser" }
-spl_analyser = { path = "src/analyser" }
-spl_irgen = { path = "src/irgen" }
+spl_parser = { version = "0.0.1", path = "src/parser" }
+spl_analyser = { version = "0.0.1", path = "src/analyser" }
+spl_irgen = { version = "0.0.1", path = "src/irgen" }
